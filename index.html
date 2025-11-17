@@ -455,9 +455,10 @@
 
         </form>
         
-        <!-- Quick scenarios button -->
-        <div style="text-align: center; margin-bottom: 20px;">
-            <button type="button" onclick="showScenarios()" style="background: #6366f1; color: white; padding: 10px 20px; font-size: 14px; border-radius: 6px;">📋 Load Test Scenarios</button>
+        <!-- Quick scenarios and controls -->
+        <div style="text-align: center; margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" onclick="showScenarios()" style="background: #6366f1; color: white; padding: 8px 16px; font-size: 13px; border-radius: 6px;">📋 Scenarios</button>
+            <button type="button" onclick="toggleDistances()" id="distanceToggle" style="background: #10b981; color: white; padding: 8px 16px; font-size: 13px; border-radius: 6px;">📏 Distances ON</button>
         </div>
         
         <!-- Hidden scenarios panel -->
@@ -468,7 +469,7 @@
                 <button type="button" onclick="loadTestCase(2); hideScenarios();" style="background: #4299e1; color: white; margin: 4px;">📋 Needs Permit</button>
                 <button type="button" onclick="loadTestCase(3); hideScenarios();" style="background: #f6ad55; color: white; margin: 4px;">🏠 Too Close to Garage</button>
                 <button type="button" onclick="loadTestCase(4); hideScenarios();" style="background: #f56565; color: white; margin: 4px;">❌ Multiple Issues</button>
-                <button type="button" onclick="loadTestCase(5); hideScenarios();" style="background: #9f7aea; color: white; margin: 4px;">🏗️ Too Large</button>
+                <button type="button" onclick="loadTestCase(5); hideScenarios();" style="background: #9f7aea; color: white; margin: 4px;">🚨 Area Limit Exceeded</button>
             </div>
         </div>
 
@@ -496,67 +497,68 @@
         let canvasScale = 1;
         let canvasOffsetX = 0;
         let canvasOffsetY = 0;
+        let showDistances = true; // Toggle for distance measurements
         
         const testCases = [
             {
                 name: "Perfect Compliance",
-                lotLength: 60, lotWidth: 40,
-                houseFront: 25, houseLeft: 10, houseLength: 30, houseWidth: 25,
-                saunaLength: 8, saunaWidth: 6, saunaHeight: 10,
-                frontSetback: 10, rearSetback: 8, leftSetback: 5, rightSetback: 5,
+                lotLength: 80, lotWidth: 60,
+                houseFront: 20, houseLeft: 10, houseLength: 25, houseWidth: 20,
+                saunaLength: 8, saunaWidth: 6, saunaHeight: 12, // Under 120 sq ft, under 15ft height
+                frontSetback: 8, rearSetback: 10, leftSetback: 40, rightSetback: 26, // 3ft+ setbacks
                 foundation: "portable", electrical: "basic",
                 hasGarage: "yes", garageLength: 20, garageWidth: 20,
-                garageFront: 5, garageRear: 15, garageLeft: 35, garageRight: 5
+                garageFront: 5, garageRear: 15, garageLeft: 50, garageRight: 10 // Garage positioned for 6ft+ from house, 3ft+ from sauna
             },
             {
                 name: "Setback Violation", 
-                lotLength: 50, lotWidth: 30,
-                houseFront: 20, houseLeft: 10, houseLength: 25, houseWidth: 20,
-                saunaLength: 10, saunaWidth: 8, saunaHeight: 12,
-                frontSetback: 5, rearSetback: 2, leftSetback: 4, rightSetback: 6,
+                lotLength: 50, lotWidth: 35,
+                houseFront: 15, houseLeft: 8, houseLength: 25, houseWidth: 18,
+                saunaLength: 8, saunaWidth: 6, saunaHeight: 11, // Small sauna
+                frontSetback: 8, rearSetback: 2, leftSetback: 1, rightSetback: 35, // LEFT setback violation (1ft < 3ft)
                 foundation: "portable", electrical: "none",
-                hasGarage: "yes", garageLength: 20, garageWidth: 20,
-                garageFront: 5, garageRear: 5, garageLeft: 25, garageRight: 5
+                hasGarage: "yes", garageLength: 15, garageWidth: 15,
+                garageFront: 5, garageRear: 15, garageLeft: 25, garageRight: 10
             },
             {
                 name: "Needs Permit",
-                lotLength: 100, lotWidth: 80,
-                houseFront: 30, houseLeft: 20, houseLength: 40, houseWidth: 35,
-                saunaLength: 12, saunaWidth: 12, saunaHeight: 14,
-                frontSetback: 6, rearSetback: 6, leftSetback: 6, rightSetback: 6,
+                lotLength: 90, lotWidth: 70,
+                houseFront: 25, houseLeft: 15, houseLength: 30, houseWidth: 25,
+                saunaLength: 12, saunaWidth: 11, saunaHeight: 14, // 132 sq ft > 120 sq ft = PERMIT REQUIRED
+                frontSetback: 8, rearSetback: 10, leftSetback: 50, rightSetback: 16, // All setbacks good
                 foundation: "permanent", electrical: "heavy",
-                hasGarage: "yes", garageLength: 20, garageWidth: 20,
-                garageFront: 25, garageRear: 35, garageLeft: 5, garageRight: 55
+                hasGarage: "yes", garageLength: 18, garageWidth: 18, // 324 sq ft + 132 = 456 sq ft (under 1200 limit)
+                garageFront: 5, garageRear: 25, garageLeft: 65, garageRight: 7
             },
             {
                 name: "Too Close to Garage",
-                lotLength: 80, lotWidth: 50,
-                houseFront: 25, houseLeft: 10, houseLength: 35, houseWidth: 20,
-                saunaLength: 10, saunaWidth: 8, saunaHeight: 12,
-                frontSetback: 15, rearSetback: 27, leftSetback: 25, rightSetback: 45,
+                lotLength: 70, lotWidth: 50,
+                houseFront: 20, houseLeft: 10, houseLength: 25, houseWidth: 18,
+                saunaLength: 8, saunaWidth: 6, saunaHeight: 13, // 48 sq ft, under permit threshold
+                frontSetback: 12, rearSetback: 20, leftSetback: 35, rightSetback: 21, // Good setbacks
                 foundation: "portable", electrical: "basic",
-                hasGarage: "yes", garageLength: 24, garageWidth: 20,
-                garageFront: 10, garageRear: 20, garageLeft: 5, garageRight: 51
+                hasGarage: "yes", garageLength: 20, garageWidth: 18,
+                garageFront: 8, garageRear: 24, garageLeft: 37, garageRight: 13 // Garage positioned 2ft from sauna (< 3ft violation)
             },
             {
                 name: "Multiple Issues",
-                lotLength: 40, lotWidth: 25,
-                houseFront: 15, houseLeft: 5, houseLength: 20, houseWidth: 18,
-                saunaLength: 15, saunaWidth: 10, saunaHeight: 18,
-                frontSetback: 2, rearSetback: 1, leftSetback: 3, rightSetback: 2,
+                lotLength: 45, lotWidth: 30,
+                houseFront: 12, houseLeft: 5, houseLength: 20, houseWidth: 15,
+                saunaLength: 12, saunaWidth: 10, saunaHeight: 18, // 120 sq ft = permit needed, 18ft HEIGHT VIOLATION (>15ft)
+                frontSetback: 2, rearSetback: 1, leftSetback: 25, rightSetback: 8, // SETBACK VIOLATIONS (front 2ft, rear 1ft < 3ft)
                 foundation: "permanent", electrical: "heavy",
-                hasGarage: "yes", garageLength: 20, garageWidth: 20,
-                garageFront: 2, garageRear: 3, garageLeft: 18, garageRight: 2
+                hasGarage: "yes", garageLength: 18, garageWidth: 16,
+                garageFront: 3, garageRear: 11, garageLeft: 22, garageRight: 5 // Sauna positioned 3ft from garage (barely compliant)
             },
             {
-                name: "Too Large",
-                lotLength: 200, lotWidth: 150,
-                houseFront: 40, houseLeft: 30, houseLength: 50, houseWidth: 40,
-                saunaLength: 35, saunaWidth: 30, saunaHeight: 12,
-                frontSetback: 10, rearSetback: 10, leftSetback: 10, rightSetback: 10,
+                name: "Area Limit Exceeded",
+                lotLength: 120, lotWidth: 80,
+                houseFront: 25, houseLeft: 20, houseLength: 40, houseWidth: 30,
+                saunaLength: 20, saunaWidth: 15, saunaHeight: 14, // 300 sq ft sauna
+                frontSetback: 8, rearSetback: 15, leftSetback: 70, rightSetback: 15, // Good setbacks
                 foundation: "permanent", electrical: "heavy",
-                hasGarage: "yes", garageLength: 24, garageWidth: 24,
-                garageFront: 25, garageRear: 101, garageLeft: 50, garageRight: 126
+                hasGarage: "yes", garageLength: 30, garageWidth: 32, // 960 sq ft garage
+                garageFront: 10, garageRear: 38, garageLeft: 25, garageRight: 65 // Total: 300 + 960 = 1,260 sq ft > 1,200 VIOLATION
             }
         ];
 
@@ -583,16 +585,16 @@
             }
         }
 
-        // Default working scenario
+        // Default working scenario - fully compliant
         const defaultScenario = {
             name: "Default Working Setup",
             lotLength: 80, lotWidth: 60,
-            houseFront: 25, houseLeft: 15, houseLength: 35, houseWidth: 30,
-            saunaLength: 10, saunaWidth: 8, saunaHeight: 12,
-            frontSetback: 8, rearSetback: 10, leftSetback: 6, rightSetback: 20,
+            houseFront: 20, houseLeft: 12, houseLength: 30, houseWidth: 25, // House positioned well
+            saunaLength: 10, saunaWidth: 8, saunaHeight: 12, // 80 sq ft (under permit), 12ft height (OK)
+            frontSetback: 8, rearSetback: 12, leftSetback: 48, rightSetback: 14, // All 3ft+ setbacks
             foundation: "portable", electrical: "basic",
-            hasGarage: "yes", garageLength: 22, garageWidth: 20,
-            garageFront: 5, garageRear: 15, garageLeft: 50, garageRight: 8
+            hasGarage: "yes", garageLength: 20, garageWidth: 18, // 360 sq ft garage
+            garageFront: 5, garageRear: 17, garageLeft: 50, garageRight: 10 // Positioned for compliance
         };
         
         // Load default scenario on page load
@@ -620,6 +622,23 @@
         
         function hideScenarios() {
             document.getElementById('scenariosPanel').style.display = 'none';
+        }
+        
+        function toggleDistances() {
+            showDistances = !showDistances;
+            const button = document.getElementById('distanceToggle');
+            if (showDistances) {
+                button.innerHTML = '📏 Distances ON';
+                button.style.background = '#10b981';
+            } else {
+                button.innerHTML = '📏 Distances OFF';
+                button.style.background = '#6b7280';
+            }
+            
+            // Redraw diagram
+            if (currentData) {
+                drawLotDiagram(currentData);
+            }
         }
         
         function loadScenario(scenario) {
@@ -983,6 +1002,211 @@
             
             // Draw resize handles for sauna
             drawResizeHandles(ctx, saunaX, saunaY, saunaW, saunaH, '#007bff');
+            
+            // Draw dynamic distances between structures (if enabled)
+            if (showDistances) {
+                drawDistanceMeasurements(ctx, data);
+            }
+        }
+        
+        function drawDistanceMeasurements(ctx, data) {
+            ctx.save();
+            
+            // Style for distance lines and labels
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]); // Dashed line
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const isMobile = window.innerWidth <= 768;
+            const fontSize = isMobile ? '12px' : '10px';
+            ctx.font = `bold ${fontSize} Arial`;
+            
+            // Get structure positions and dimensions
+            const sauna = {
+                x: canvasOffsetX + (parseInt(data.leftSetback) * canvasScale),
+                y: canvasOffsetY + (parseInt(data.frontSetback) * canvasScale),
+                w: parseInt(data.saunaLength) * canvasScale,
+                h: parseInt(data.saunaWidth) * canvasScale,
+                centerX: canvasOffsetX + (parseInt(data.leftSetback) + parseInt(data.saunaLength)/2) * canvasScale,
+                centerY: canvasOffsetY + (parseInt(data.frontSetback) + parseInt(data.saunaWidth)/2) * canvasScale
+            };
+            
+            const house = {
+                x: canvasOffsetX + (parseInt(data.houseLeft) * canvasScale),
+                y: canvasOffsetY + (parseInt(data.houseFront) * canvasScale),
+                w: parseInt(data.houseLength) * canvasScale,
+                h: parseInt(data.houseWidth) * canvasScale,
+                centerX: canvasOffsetX + (parseInt(data.houseLeft) + parseInt(data.houseLength)/2) * canvasScale,
+                centerY: canvasOffsetY + (parseInt(data.houseFront) + parseInt(data.houseWidth)/2) * canvasScale
+            };
+            
+            const garage = data.hasGarage === 'yes' ? {
+                x: canvasOffsetX + (parseInt(data.garageLeft) * canvasScale),
+                y: canvasOffsetY + (parseInt(data.garageFront) * canvasScale),
+                w: parseInt(data.garageLength) * canvasScale,
+                h: parseInt(data.garageWidth) * canvasScale,
+                centerX: canvasOffsetX + (parseInt(data.garageLeft) + parseInt(data.garageLength)/2) * canvasScale,
+                centerY: canvasOffsetY + (parseInt(data.garageFront) + parseInt(data.garageWidth)/2) * canvasScale
+            } : null;
+            
+            // Draw distance from sauna to house (edge to edge)
+            if (house.w > 0) {
+                const distance = calculateDistanceFromHouse(data);
+                const points = findClosestEdgePoints(sauna, house);
+                if (points && distance > 0) {
+                    drawDistanceLine(ctx, points.x1, points.y1, points.x2, points.y2, `${distance.toFixed(1)}'`, '#17a2b8');
+                }
+            }
+            
+            // Draw distance from sauna to garage (edge to edge)
+            if (garage) {
+                const distance = calculateDistanceFromGarage(data);
+                const points = findClosestEdgePoints(sauna, garage);
+                if (points && distance > 0) {
+                    drawDistanceLine(ctx, points.x1, points.y1, points.x2, points.y2, `${distance.toFixed(1)}'`, '#6c757d');
+                }
+            }
+            
+            // Draw distance from house to garage (edge to edge)
+            if (house.w > 0 && garage) {
+                const distance = calculateEdgeToEdgeDistance(house, garage);
+                const points = findClosestEdgePoints(house, garage);
+                if (points && distance > 0) {
+                    drawDistanceLine(ctx, points.x1, points.y1, points.x2, points.y2, `${distance.toFixed(1)}'`, '#8e44ad');
+                }
+            }
+            
+            ctx.restore();
+        }
+        
+        function drawDistanceLine(ctx, x1, y1, x2, y2, label, color) {
+            // Skip if structures are overlapping or too close
+            const distance = Math.sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
+            if (distance < 20) return; // Too close to draw meaningful line
+            
+            // Draw dashed line between centers
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            
+            // Calculate midpoint for label
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            
+            // Draw label background
+            const metrics = ctx.measureText(label);
+            const labelW = metrics.width + 8;
+            const labelH = 16;
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(midX - labelW/2, midY - labelH/2, labelW, labelH);
+            
+            // Draw label text
+            ctx.fillStyle = 'white';
+            ctx.fillText(label, midX, midY);
+        }
+        
+        function findClosestEdgePoints(struct1, struct2) {
+            // Find the closest points on the edges of two rectangles
+            const rect1 = {
+                left: struct1.x,
+                right: struct1.x + struct1.w,
+                top: struct1.y,
+                bottom: struct1.y + struct1.h
+            };
+            
+            const rect2 = {
+                left: struct2.x,
+                right: struct2.x + struct2.w,
+                top: struct2.y,
+                bottom: struct2.y + struct2.h
+            };
+            
+            // Check if rectangles overlap
+            if (rect1.left < rect2.right && rect1.right > rect2.left && 
+                rect1.top < rect2.bottom && rect1.bottom > rect2.top) {
+                return null; // Overlapping, no meaningful distance line
+            }
+            
+            let x1, y1, x2, y2;
+            
+            // Determine which edges are closest
+            if (rect1.right <= rect2.left) {
+                // rect1 is to the left of rect2
+                x1 = rect1.right;
+                x2 = rect2.left;
+                y1 = Math.max(rect1.top, Math.min(rect1.bottom, (rect2.top + rect2.bottom) / 2));
+                y2 = Math.max(rect2.top, Math.min(rect2.bottom, (rect1.top + rect1.bottom) / 2));
+            } else if (rect2.right <= rect1.left) {
+                // rect2 is to the left of rect1
+                x1 = rect1.left;
+                x2 = rect2.right;
+                y1 = Math.max(rect1.top, Math.min(rect1.bottom, (rect2.top + rect2.bottom) / 2));
+                y2 = Math.max(rect2.top, Math.min(rect2.bottom, (rect1.top + rect1.bottom) / 2));
+            } else if (rect1.bottom <= rect2.top) {
+                // rect1 is above rect2
+                y1 = rect1.bottom;
+                y2 = rect2.top;
+                x1 = Math.max(rect1.left, Math.min(rect1.right, (rect2.left + rect2.right) / 2));
+                x2 = Math.max(rect2.left, Math.min(rect2.right, (rect1.left + rect1.right) / 2));
+            } else if (rect2.bottom <= rect1.top) {
+                // rect2 is above rect1
+                y1 = rect1.top;
+                y2 = rect2.bottom;
+                x1 = Math.max(rect1.left, Math.min(rect1.right, (rect2.left + rect2.right) / 2));
+                x2 = Math.max(rect2.left, Math.min(rect2.right, (rect1.left + rect1.right) / 2));
+            } else {
+                // Diagonal positioning - find closest corner to corner
+                const corners1 = [
+                    {x: rect1.left, y: rect1.top},
+                    {x: rect1.right, y: rect1.top},
+                    {x: rect1.left, y: rect1.bottom},
+                    {x: rect1.right, y: rect1.bottom}
+                ];
+                
+                const corners2 = [
+                    {x: rect2.left, y: rect2.top},
+                    {x: rect2.right, y: rect2.top},
+                    {x: rect2.left, y: rect2.bottom},
+                    {x: rect2.right, y: rect2.bottom}
+                ];
+                
+                let minDist = Infinity;
+                let closestPair = null;
+                
+                corners1.forEach(c1 => {
+                    corners2.forEach(c2 => {
+                        const dist = Math.sqrt((c1.x - c2.x) ** 2 + (c1.y - c2.y) ** 2);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closestPair = {x1: c1.x, y1: c1.y, x2: c2.x, y2: c2.y};
+                        }
+                    });
+                });
+                
+                if (closestPair) {
+                    x1 = closestPair.x1;
+                    y1 = closestPair.y1;
+                    x2 = closestPair.x2;
+                    y2 = closestPair.y2;
+                }
+            }
+            
+            return {x1, y1, x2, y2};
+        }
+        
+        function calculateEdgeToEdgeDistance(struct1, struct2) {
+            const points = findClosestEdgePoints(struct1, struct2);
+            if (!points) return 0; // Overlapping
+            
+            const dx = (points.x2 - points.x1) / canvasScale;
+            const dy = (points.y2 - points.y1) / canvasScale;
+            return Math.sqrt(dx * dx + dy * dy);
         }
         
         function drawDimensionLabels(ctx, x, y, w, h, lengthFt, widthFt, color) {
