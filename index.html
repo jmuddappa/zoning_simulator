@@ -209,11 +209,53 @@
             margin: 10px auto;
             background: #fff;
             cursor: grab;
-            max-width: 100%;
+            width: 100%;
             height: auto;
             display: block;
             touch-action: pan-x pan-y;
             transition: box-shadow 0.2s;
+            min-height: 400px;
+        }
+        
+        /* Mobile-specific canvas sizing */
+        @media (max-width: 768px) {
+            #lotDiagram {
+                width: calc(100vw - 40px);
+                max-width: none;
+                min-height: 60vh;
+                border-radius: 6px;
+            }
+            
+            .diagram-container {
+                padding: 10px !important;
+                margin: 0 -10px !important;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .height-controls {
+                padding: 15px !important;
+                margin-bottom: 15px !important;
+            }
+            
+            .height-controls h3 {
+                font-size: 14px !important;
+                margin-bottom: 10px !important;
+            }
+            
+            .height-controls label {
+                font-size: 12px !important;
+            }
+        }
+        
+        /* Height controls styling */
+        .height-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
         }
         #lotDiagram:hover {
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -258,19 +300,19 @@
         <h1>🏠 Saint Paul Sauna Zoning Tool</h1>
         <p style="text-align: center; color: #666; margin-bottom: 30px;">Drag and resize structures to check zoning compliance</p>
         
-        <div id="heightControls" style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+        <div id="heightControls" class="height-controls">
             <h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 16px;">Structure Heights (feet)</h3>
             <div class="row">
                 <div class="col">
-                    <label for="saunaHeight" style="font-size: 14px;">Sauna Height:</label>
+                    <label for="saunaHeight" style="font-size: 14px;">Sauna:</label>
                     <input type="number" id="saunaHeight" value="12" min="6" max="20" style="padding: 8px;">
                 </div>
                 <div class="col">
-                    <label for="houseHeight" style="font-size: 14px;">House Height:</label>
+                    <label for="houseHeight" style="font-size: 14px;">House:</label>
                     <input type="number" id="houseHeight" value="20" min="10" max="35" style="padding: 8px;">
                 </div>
                 <div class="col">
-                    <label for="garageHeight" style="font-size: 14px;">Garage Height:</label>
+                    <label for="garageHeight" style="font-size: 14px;">Garage:</label>
                     <input type="number" id="garageHeight" value="15" min="8" max="25" style="padding: 8px;">
                 </div>
             </div>
@@ -434,7 +476,7 @@
             <h2>Compliance Results</h2>
             <div class="diagram-container">
                 <h3>📐 Lot Diagram</h3>
-                <canvas id="lotDiagram" width="600" height="450"></canvas>
+                <canvas id="lotDiagram" width="800" height="600"></canvas>
                 <div class="legend">
                     <span><span style="color: #dc3545;">■</span> Non-compliant area</span>
                     <span><span style="color: #28a745;">■</span> Compliant area</span>
@@ -947,8 +989,13 @@
         function drawDimensionLabels(ctx, x, y, w, h, lengthFt, widthFt, color) {
             ctx.save();
             
-            // Style for dimension labels
-            ctx.font = 'bold 11px Arial';
+            // Style for dimension labels - larger for mobile
+            const isMobile = window.innerWidth <= 768;
+            const fontSize = isMobile ? '14px' : '11px';
+            const boxPadding = isMobile ? 10 : 8;
+            const boxHeight = isMobile ? 18 : 14;
+            
+            ctx.font = `bold ${fontSize} Arial`;
             ctx.fillStyle = 'white';
             ctx.strokeStyle = color;
             ctx.lineWidth = 3;
@@ -962,8 +1009,8 @@
             
             // Draw background box for better visibility
             const topMetrics = ctx.measureText(topText);
-            const topBoxW = topMetrics.width + 8;
-            const topBoxH = 14;
+            const topBoxW = topMetrics.width + boxPadding;
+            const topBoxH = boxHeight;
             
             ctx.fillStyle = color;
             ctx.fillRect(topX - topBoxW/2, topY - topBoxH/2, topBoxW, topBoxH);
@@ -983,8 +1030,8 @@
             
             // Draw background box
             const rightMetrics = ctx.measureText(rightText);
-            const rightBoxW = rightMetrics.width + 8;
-            const rightBoxH = 14;
+            const rightBoxW = rightMetrics.width + boxPadding;
+            const rightBoxH = boxHeight;
             
             ctx.fillStyle = color;
             ctx.fillRect(-rightBoxW/2, -rightBoxH/2, rightBoxW, rightBoxH);
