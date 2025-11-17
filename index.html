@@ -134,6 +134,26 @@
             </div>
 
             <div class="form-group">
+                <label>Main House Position (feet from property lines):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="houseFront" name="houseFront" placeholder="From front" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="houseLeft" name="houseLeft" placeholder="From left" required>
+                    </div>
+                </div>
+                <div class="row" style="margin-top: 15px;">
+                    <div class="col">
+                        <input type="number" id="houseLength" name="houseLength" placeholder="House length" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="houseWidth" name="houseWidth" placeholder="House width" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label>Sauna Dimensions (feet):</label>
                 <div class="row">
                     <div class="col">
@@ -253,10 +273,11 @@
                     <span style="color: #dc3545;">■</span> Non-compliant area &nbsp;
                     <span style="color: #28a745;">■</span> Compliant area &nbsp;
                     <span style="color: #007bff;">■</span> Proposed sauna &nbsp;
-                    <span style="color: #6c757d;">■</span> Existing garage
+                    <span style="color: #6c757d;">■</span> Existing garage &nbsp;
+                    <span style="color: #17a2b8;">■</span> Main house
                 </p>
                 <p style="font-size: 11px; color: #666; font-style: italic;">
-                    💡 Click and drag the sauna to see live compliance updates!
+                    💡 Click and drag structures to move • Drag corner handles to resize!
                 </p>
             </div>
             <div id="resultContent"></div>
@@ -266,8 +287,11 @@
     <script>
         // Interactive diagram variables
         let isDragging = false;
+        let isResizing = false;
         let dragStartX = 0;
         let dragStartY = 0;
+        let dragMode = 'move'; // 'move', 'resize-sauna', 'resize-garage'
+        let resizeCorner = ''; // 'br' for bottom-right corner
         let currentData = null;
         let canvasScale = 1;
         let canvasOffsetX = 0;
@@ -278,6 +302,10 @@
                 name: "Perfect Compliance",
                 lotLength: 60,
                 lotWidth: 40,
+                houseFront: 25,
+                houseLeft: 10,
+                houseLength: 30,
+                houseWidth: 25,
                 saunaLength: 8,
                 saunaWidth: 6,
                 saunaHeight: 10,
@@ -299,6 +327,10 @@
                 name: "Setback Violation",
                 lotLength: 50,
                 lotWidth: 30,
+                houseFront: 20,
+                houseLeft: 10,
+                houseLength: 25,
+                houseWidth: 20,
                 saunaLength: 10,
                 saunaWidth: 8,
                 saunaHeight: 12,
@@ -320,6 +352,10 @@
                 name: "Needs Permit",
                 lotLength: 100,
                 lotWidth: 80,
+                houseFront: 30,
+                houseLeft: 20,
+                houseLength: 40,
+                houseWidth: 35,
                 saunaLength: 12,
                 saunaWidth: 12,
                 saunaHeight: 14,
@@ -341,6 +377,10 @@
                 name: "Too Close to Garage",
                 lotLength: 80,
                 lotWidth: 50,
+                houseFront: 25,
+                houseLeft: 10,
+                houseLength: 35,
+                houseWidth: 20,
                 saunaLength: 10,
                 saunaWidth: 8,
                 saunaHeight: 12,
@@ -362,6 +402,10 @@
                 name: "Multiple Issues",
                 lotLength: 40,
                 lotWidth: 25,
+                houseFront: 15,
+                houseLeft: 5,
+                houseLength: 20,
+                houseWidth: 18,
                 saunaLength: 15,
                 saunaWidth: 10,
                 saunaHeight: 18,
@@ -383,6 +427,10 @@
                 name: "Too Large",
                 lotLength: 200,
                 lotWidth: 150,
+                houseFront: 40,
+                houseLeft: 30,
+                houseLength: 50,
+                houseWidth: 40,
                 saunaLength: 35,
                 saunaWidth: 30,
                 saunaHeight: 12,
@@ -413,6 +461,10 @@
             
             document.getElementById('lotLength').value = testCase.lotLength;
             document.getElementById('lotWidth').value = testCase.lotWidth;
+            document.getElementById('houseFront').value = testCase.houseFront;
+            document.getElementById('houseLeft').value = testCase.houseLeft;
+            document.getElementById('houseLength').value = testCase.houseLength;
+            document.getElementById('houseWidth').value = testCase.houseWidth;
             document.getElementById('saunaLength').value = testCase.saunaLength;
             document.getElementById('saunaWidth').value = testCase.saunaWidth;
             document.getElementById('saunaHeight').value = testCase.saunaHeight;
@@ -454,20 +506,16 @@
             const formData = new FormData(form);
             const data = Object.fromEntries(formData);
             
-            const saunaArea = parseInt(data.saunaLength) * parseInt(data.saunaWidth);
-            const lotArea = parseInt(data.lotLength) * parseInt(data.lotWidth);
+            // Use the comprehensive compliance check
+            runFullComplianceCheck(data);
+        }
+        
+        function drawLotDiagram(data) {
+            const canvas = document.getElementById('lotDiagram');
+            const ctx = canvas.getContext('2d');
             
-            let results = [];
-            let overallCompliant = true;
-            
-            // Check setbacks (3ft minimum for Saint Paul)
-            const minSetback = 3;
-            const setbacks = {
-                rear: parseInt(data.rearSetback),
-                left: parseInt(data.leftSetback),
-                right: parseInt(data.rightSetback),
-                front: parseInt(data.frontSetback)
-            };
+            const lotLength = parseInt(data.lotLength);
+            const lotWidth = parseInt(data.lotWidth);
             
             Object.entries(setbacks).forEach(([side, distance]) => {
                 if (distance < minSetback) {
@@ -555,20 +603,45 @@
                 const saunaRightEdge = leftSetback + parseInt(data.saunaLength);
                 const saunaBottomEdge = frontSetback + parseInt(data.saunaWidth);
                 
-                // Check if structures are too close (need 6ft between them)
+                // Check minimum distance between rectangles (need 6ft between them)
                 let tooClose = false;
                 let distanceIssue = '';
+                let minDistance = Infinity;
                 
-                // Horizontal spacing check
-                if ((saunaRightEdge > garageLeft && leftSetback < garageRightEdge)) {
-                    // Overlapping horizontally, check vertical distance
-                    const verticalGap = Math.min(
-                        Math.abs(frontSetback - garageBottomEdge),
-                        Math.abs(saunaBottomEdge - garageFront)
-                    );
-                    if (verticalGap < 6) {
+                // Check for overlap first
+                const horizontalOverlap = saunaRightEdge > garageLeft && leftSetback < garageRightEdge;
+                const verticalOverlap = saunaBottomEdge > garageFront && frontSetback < garageBottomEdge;
+                
+                if (horizontalOverlap && verticalOverlap) {
+                    // Structures are overlapping!
+                    tooClose = true;
+                    distanceIssue = 'OVERLAPPING';
+                } else {
+                    // Calculate minimum distance between non-overlapping rectangles
+                    if (horizontalOverlap) {
+                        // Horizontally aligned, check vertical distance
+                        if (frontSetback >= garageBottomEdge) {
+                            minDistance = frontSetback - garageBottomEdge;
+                        } else {
+                            minDistance = garageFront - saunaBottomEdge;
+                        }
+                    } else if (verticalOverlap) {
+                        // Vertically aligned, check horizontal distance  
+                        if (leftSetback >= garageRightEdge) {
+                            minDistance = leftSetback - garageRightEdge;
+                        } else {
+                            minDistance = garageLeft - saunaRightEdge;
+                        }
+                    } else {
+                        // Diagonally separated, calculate corner-to-corner distance
+                        const horizontalGap = Math.max(0, Math.max(garageLeft - saunaRightEdge, leftSetback - garageRightEdge));
+                        const verticalGap = Math.max(0, Math.max(garageFront - saunaBottomEdge, frontSetback - garageBottomEdge));
+                        minDistance = Math.sqrt(horizontalGap * horizontalGap + verticalGap * verticalGap);
+                    }
+                    
+                    if (minDistance < 6) {
                         tooClose = true;
-                        distanceIssue = `${verticalGap.toFixed(1)}ft apart vertically`;
+                        distanceIssue = `${minDistance.toFixed(1)}ft apart`;
                     }
                 }
                 
@@ -584,6 +657,74 @@
                         message: `✅ Garage spacing: Adequate distance from existing structures`
                     });
                 }
+            }
+            
+            // Check distance from main house (6ft minimum per Saint Paul)
+            const houseFront = parseInt(data.houseFront);
+            const houseLeft = parseInt(data.houseLeft);
+            const houseLength = parseInt(data.houseLength);
+            const houseWidth = parseInt(data.houseWidth);
+            
+            const houseRightEdge = houseLeft + houseLength;
+            const houseBottomEdge = houseFront + houseWidth;
+            
+            const saunaRightEdge = leftSetback + parseInt(data.saunaLength);
+            const saunaBottomEdge = frontSetback + parseInt(data.saunaWidth);
+            
+            // Calculate minimum distance from house
+            let houseDistance = Infinity;
+            const houseHorizontalOverlap = saunaRightEdge > houseLeft && leftSetback < houseRightEdge;
+            const houseVerticalOverlap = saunaBottomEdge > houseFront && frontSetback < houseBottomEdge;
+            
+            if (houseHorizontalOverlap && houseVerticalOverlap) {
+                houseDistance = 0; // Overlapping
+            } else if (houseHorizontalOverlap) {
+                houseDistance = Math.min(
+                    Math.abs(frontSetback - houseBottomEdge),
+                    Math.abs(saunaBottomEdge - houseFront)
+                );
+            } else if (houseVerticalOverlap) {
+                houseDistance = Math.min(
+                    Math.abs(leftSetback - houseRightEdge),
+                    Math.abs(saunaRightEdge - houseLeft)
+                );
+            } else {
+                const horizGap = Math.max(0, Math.max(houseLeft - saunaRightEdge, leftSetback - houseRightEdge));
+                const vertGap = Math.max(0, Math.max(houseFront - saunaBottomEdge, frontSetback - houseBottomEdge));
+                houseDistance = Math.sqrt(horizGap * horizGap + vertGap * vertGap);
+            }
+            
+            if (houseDistance < 6) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ House distance: ${houseDistance === 0 ? 'OVERLAPPING' : houseDistance.toFixed(1) + 'ft'} from main house (needs 6ft minimum per Saint Paul code)`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ House distance: ${houseDistance.toFixed(1)}ft from main house (compliant)`
+                });
+            }
+            
+            // Check total accessory building area (1,200 sq ft max per Saint Paul)
+            let totalAccessoryArea = saunaArea;
+            if (data.hasGarage === 'yes') {
+                const garageArea = parseInt(data.garageLength) * parseInt(data.garageWidth);
+                totalAccessoryArea += garageArea;
+            }
+            
+            if (totalAccessoryArea > 1200) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Total accessory area: ${totalAccessoryArea} sq ft exceeds Saint Paul's 1,200 sq ft combined limit`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Total accessory area: ${totalAccessoryArea} sq ft (within 1,200 sq ft Saint Paul limit)`
+                });
             }
             
             // Check electrical requirements
@@ -713,6 +854,35 @@
                 ctx.fillRect(compliantX, compliantY, compliantWidth, compliantHeight);
             }
             
+            // Draw main house
+            const houseFront = parseInt(data.houseFront) || 0;
+            const houseLeft = parseInt(data.houseLeft) || 0;
+            const houseLength = parseInt(data.houseLength) || 0;
+            const houseWidth = parseInt(data.houseWidth) || 0;
+            
+            const houseX = offsetX + (houseLeft * scale);
+            const houseY = offsetY + (houseFront * scale);
+            const houseScaledLength = houseLength * scale;
+            const houseScaledWidth = houseWidth * scale;
+            
+            if (houseX + houseScaledLength <= offsetX + scaledLength && 
+                houseY + houseScaledWidth <= offsetY + scaledWidth) {
+                
+                // Draw house in teal
+                ctx.fillStyle = 'rgba(23, 162, 184, 0.8)';
+                ctx.fillRect(houseX, houseY, houseScaledLength, houseScaledWidth);
+                
+                ctx.strokeStyle = '#17a2b8';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(houseX, houseY, houseScaledLength, houseScaledWidth);
+                
+                // Add house label
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('HOUSE', houseX + houseScaledLength/2, houseY + houseScaledWidth/2 + 4);
+            }
+            
             // Draw existing garage if present
             if (data.hasGarage === 'yes') {
                 const garageLength = parseInt(data.garageLength) || 0;
@@ -741,6 +911,9 @@
                     ctx.font = '10px Arial';
                     ctx.textAlign = 'center';
                     ctx.fillText('GARAGE', garageX + garageScaledLength/2, garageY + garageScaledWidth/2 + 3);
+                    
+                    // Draw resize handle on bottom-right corner
+                    drawResizeHandle(ctx, garageX + garageScaledLength - 6, garageY + garageScaledWidth - 6, '#6c757d');
                 }
             }
 
@@ -771,6 +944,9 @@
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('SAUNA', saunaX + saunaScaledLength/2, saunaY + saunaScaledWidth/2 + 3);
+                
+                // Draw resize handle on bottom-right corner
+                drawResizeHandle(ctx, saunaX + saunaScaledLength - 6, saunaY + saunaScaledWidth - 6, '#007bff');
             }
             
             // Add labels
@@ -805,6 +981,25 @@
             ctx.restore();
         }
         
+        function drawResizeHandle(ctx, x, y, color) {
+            // Draw small square resize handle
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, 12, 12);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, 12, 12);
+            
+            // Add diagonal lines to indicate resize
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x + 3, y + 9);
+            ctx.lineTo(x + 9, y + 3);
+            ctx.moveTo(x + 6, y + 9);
+            ctx.lineTo(x + 9, y + 6);
+            ctx.stroke();
+        }
+        
         function setupCanvasInteraction() {
             const canvas = document.getElementById('lotDiagram');
             
@@ -812,6 +1007,66 @@
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('mouseleave', handleMouseUp);
+            
+            // Add hover detection for resize cursors
+            canvas.addEventListener('mousemove', handleHover);
+        }
+        
+        function handleHover(e) {
+            if (isDragging || !currentData) return;
+            
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Calculate structure positions
+            const saunaX = canvasOffsetX + (parseInt(currentData.leftSetback) * canvasScale);
+            const saunaY = canvasOffsetY + (parseInt(currentData.frontSetback) * canvasScale);
+            const saunaWidth = parseInt(currentData.saunaLength) * canvasScale;
+            const saunaHeight = parseInt(currentData.saunaWidth) * canvasScale;
+            
+            let garageX, garageY, garageWidth, garageHeight;
+            if (currentData.hasGarage === 'yes') {
+                garageX = canvasOffsetX + (parseInt(currentData.garageLeft) * canvasScale);
+                garageY = canvasOffsetY + (parseInt(currentData.garageFront) * canvasScale);
+                garageWidth = parseInt(currentData.garageLength) * canvasScale;
+                garageHeight = parseInt(currentData.garageWidth) * canvasScale;
+            }
+            
+            // Check for resize handles
+            // Sauna resize handle (positioned at -6, so check from -6 to +6)
+            if (x >= saunaX + saunaWidth - 6 - 6 && x <= saunaX + saunaWidth - 6 + 6 && 
+                y >= saunaY + saunaHeight - 6 - 6 && y <= saunaY + saunaHeight - 6 + 6) {
+                e.target.style.cursor = 'nw-resize';
+                return;
+            }
+            
+            // Garage resize handle (positioned at -6, so check from -6 to +6)
+            if (currentData.hasGarage === 'yes' && 
+                x >= garageX + garageWidth - 6 - 6 && x <= garageX + garageWidth - 6 + 6 && 
+                y >= garageY + garageHeight - 6 - 6 && y <= garageY + garageHeight - 6 + 6) {
+                e.target.style.cursor = 'nw-resize';
+                return;
+            }
+            
+            // Check for moveable structures
+            // Sauna move
+            if (x >= saunaX && x <= saunaX + saunaWidth && 
+                y >= saunaY && y <= saunaY + saunaHeight) {
+                e.target.style.cursor = 'grab';
+                return;
+            }
+            
+            // Garage move
+            if (currentData.hasGarage === 'yes' &&
+                x >= garageX && x <= garageX + garageWidth && 
+                y >= garageY && y <= garageY + garageHeight) {
+                e.target.style.cursor = 'grab';
+                return;
+            }
+            
+            // Default cursor
+            e.target.style.cursor = 'default';
         }
         
         function handleMouseDown(e) {
@@ -821,18 +1076,70 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Check if click is on sauna
+            // Calculate structure positions
             const saunaX = canvasOffsetX + (parseInt(currentData.leftSetback) * canvasScale);
             const saunaY = canvasOffsetY + (parseInt(currentData.frontSetback) * canvasScale);
             const saunaWidth = parseInt(currentData.saunaLength) * canvasScale;
             const saunaHeight = parseInt(currentData.saunaWidth) * canvasScale;
             
+            let garageX, garageY, garageWidth, garageHeight;
+            if (currentData.hasGarage === 'yes') {
+                garageX = canvasOffsetX + (parseInt(currentData.garageLeft) * canvasScale);
+                garageY = canvasOffsetY + (parseInt(currentData.garageFront) * canvasScale);
+                garageWidth = parseInt(currentData.garageLength) * canvasScale;
+                garageHeight = parseInt(currentData.garageWidth) * canvasScale;
+            }
+            
+            // Check for resize handles first (higher priority)
+            // Sauna resize handle (positioned at -6, so check from -6 to +6)
+            if (x >= saunaX + saunaWidth - 6 - 6 && x <= saunaX + saunaWidth - 6 + 6 && 
+                y >= saunaY + saunaHeight - 6 - 6 && y <= saunaY + saunaHeight - 6 + 6) {
+                isDragging = true;
+                isResizing = true;
+                dragMode = 'resize-sauna';
+                dragStartX = x;
+                dragStartY = y;
+                e.target.style.cursor = 'nw-resize';
+                return;
+            }
+            
+            // Garage resize handle (positioned at -6, so check from -6 to +6)
+            if (currentData.hasGarage === 'yes' && 
+                x >= garageX + garageWidth - 6 - 6 && x <= garageX + garageWidth - 6 + 6 && 
+                y >= garageY + garageHeight - 6 - 6 && y <= garageY + garageHeight - 6 + 6) {
+                isDragging = true;
+                isResizing = true;
+                dragMode = 'resize-garage';
+                dragStartX = x;
+                dragStartY = y;
+                e.target.style.cursor = 'nw-resize';
+                return;
+            }
+            
+            // Check for moving structures
+            // Sauna move
             if (x >= saunaX && x <= saunaX + saunaWidth && 
                 y >= saunaY && y <= saunaY + saunaHeight) {
                 isDragging = true;
+                isResizing = false;
+                dragMode = 'move-sauna';
                 dragStartX = x - saunaX;
                 dragStartY = y - saunaY;
                 e.target.style.cursor = 'grabbing';
+                return;
+            }
+            
+            // Garage move
+            if (currentData.hasGarage === 'yes' &&
+                x >= garageX && x <= garageX + garageWidth && 
+                y >= garageY && y <= garageY + garageHeight) {
+                isDragging = true;
+                isResizing = false;
+                dragMode = 'move-garage';
+                dragStartX = x - garageX;
+                dragStartY = y - garageY;
+                e.target.style.cursor = 'grabbing';
+                return;
             }
         }
         
@@ -843,42 +1150,175 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Calculate new sauna position
-            const newSaunaX = x - dragStartX;
-            const newSaunaY = y - dragStartY;
-            
-            // Convert back to lot coordinates
-            const newLeftSetback = Math.max(0, Math.round((newSaunaX - canvasOffsetX) / canvasScale));
-            const newFrontSetback = Math.max(0, Math.round((newSaunaY - canvasOffsetY) / canvasScale));
-            
-            // Ensure sauna stays within lot boundaries
             const lotLength = parseInt(currentData.lotLength);
             const lotWidth = parseInt(currentData.lotWidth);
-            const saunaLength = parseInt(currentData.saunaLength);
-            const saunaWidth = parseInt(currentData.saunaWidth);
             
-            const maxLeftSetback = lotLength - saunaLength;
-            const maxFrontSetback = lotWidth - saunaWidth;
-            
-            const clampedLeftSetback = Math.min(maxLeftSetback, newLeftSetback);
-            const clampedFrontSetback = Math.min(maxFrontSetback, newFrontSetback);
-            
-            // Update form fields
-            document.getElementById('leftSetback').value = clampedLeftSetback;
-            document.getElementById('frontSetback').value = clampedFrontSetback;
-            
-            // Calculate rear and right setbacks
-            const newRearSetback = lotWidth - clampedFrontSetback - saunaWidth;
-            const newRightSetback = lotLength - clampedLeftSetback - saunaLength;
-            
-            document.getElementById('rearSetback').value = Math.max(0, newRearSetback);
-            document.getElementById('rightSetback').value = Math.max(0, newRightSetback);
-            
-            // Update current data
-            currentData.leftSetback = clampedLeftSetback;
-            currentData.frontSetback = clampedFrontSetback;
-            currentData.rearSetback = Math.max(0, newRearSetback);
-            currentData.rightSetback = Math.max(0, newRightSetback);
+            if (dragMode === 'move-sauna') {
+                // Calculate new sauna position
+                const newSaunaX = x - dragStartX;
+                const newSaunaY = y - dragStartY;
+                
+                // Convert back to lot coordinates
+                const newLeftSetback = Math.max(0, Math.round((newSaunaX - canvasOffsetX) / canvasScale));
+                const newFrontSetback = Math.max(0, Math.round((newSaunaY - canvasOffsetY) / canvasScale));
+                
+                const saunaLength = parseInt(currentData.saunaLength);
+                const saunaWidth = parseInt(currentData.saunaWidth);
+                
+                const maxLeftSetback = lotLength - saunaLength;
+                const maxFrontSetback = lotWidth - saunaWidth;
+                
+                const clampedLeftSetback = Math.min(maxLeftSetback, newLeftSetback);
+                const clampedFrontSetback = Math.min(maxFrontSetback, newFrontSetback);
+                
+                // Update form fields
+                document.getElementById('leftSetback').value = clampedLeftSetback;
+                document.getElementById('frontSetback').value = clampedFrontSetback;
+                
+                // Calculate rear and right setbacks
+                const newRearSetback = lotWidth - clampedFrontSetback - saunaWidth;
+                const newRightSetback = lotLength - clampedLeftSetback - saunaLength;
+                
+                document.getElementById('rearSetback').value = Math.max(0, newRearSetback);
+                document.getElementById('rightSetback').value = Math.max(0, newRightSetback);
+                
+                // Update current data
+                currentData.leftSetback = clampedLeftSetback;
+                currentData.frontSetback = clampedFrontSetback;
+                currentData.rearSetback = Math.max(0, newRearSetback);
+                currentData.rightSetback = Math.max(0, newRightSetback);
+                
+            } else if (dragMode === 'resize-sauna') {
+                // Calculate size change
+                const deltaX = x - dragStartX;
+                const deltaY = y - dragStartY;
+                
+                // Convert to lot units
+                const deltaLength = Math.round(deltaX / canvasScale);
+                const deltaWidth = Math.round(deltaY / canvasScale);
+                
+                // Calculate new dimensions
+                const currentLength = parseInt(currentData.saunaLength);
+                const currentWidth = parseInt(currentData.saunaWidth);
+                
+                const newLength = Math.max(4, currentLength + deltaLength); // Min 4ft
+                const newWidth = Math.max(4, currentWidth + deltaWidth); // Min 4ft
+                
+                // Check if new size fits on lot
+                const leftSetback = parseInt(currentData.leftSetback);
+                const frontSetback = parseInt(currentData.frontSetback);
+                
+                const maxLength = lotLength - leftSetback;
+                const maxWidth = lotWidth - frontSetback;
+                
+                const clampedLength = Math.min(maxLength, newLength);
+                const clampedWidth = Math.min(maxWidth, newWidth);
+                
+                // Update form fields
+                document.getElementById('saunaLength').value = clampedLength;
+                document.getElementById('saunaWidth').value = clampedWidth;
+                
+                // Update current data
+                currentData.saunaLength = clampedLength;
+                currentData.saunaWidth = clampedWidth;
+                
+                // Recalculate setbacks
+                const newRearSetback = lotWidth - frontSetback - clampedWidth;
+                const newRightSetback = lotLength - leftSetback - clampedLength;
+                
+                document.getElementById('rearSetback').value = Math.max(0, newRearSetback);
+                document.getElementById('rightSetback').value = Math.max(0, newRightSetback);
+                
+                currentData.rearSetback = Math.max(0, newRearSetback);
+                currentData.rightSetback = Math.max(0, newRightSetback);
+                
+                // Update drag start for smooth resizing
+                dragStartX = x;
+                dragStartY = y;
+                
+            } else if (dragMode === 'move-garage') {
+                // Calculate new garage position
+                const newGarageX = x - dragStartX;
+                const newGarageY = y - dragStartY;
+                
+                // Convert back to lot coordinates
+                const newGarageLeft = Math.max(0, Math.round((newGarageX - canvasOffsetX) / canvasScale));
+                const newGarageFront = Math.max(0, Math.round((newGarageY - canvasOffsetY) / canvasScale));
+                
+                const garageLength = parseInt(currentData.garageLength);
+                const garageWidth = parseInt(currentData.garageWidth);
+                
+                const maxGarageLeft = lotLength - garageLength;
+                const maxGarageFront = lotWidth - garageWidth;
+                
+                const clampedGarageLeft = Math.min(maxGarageLeft, newGarageLeft);
+                const clampedGarageFront = Math.min(maxGarageFront, newGarageFront);
+                
+                // Update form fields
+                document.getElementById('garageLeft').value = clampedGarageLeft;
+                document.getElementById('garageFront').value = clampedGarageFront;
+                
+                // Calculate rear and right positions
+                const newGarageRear = lotWidth - clampedGarageFront - garageWidth;
+                const newGarageRight = lotLength - clampedGarageLeft - garageLength;
+                
+                document.getElementById('garageRear').value = Math.max(0, newGarageRear);
+                document.getElementById('garageRight').value = Math.max(0, newGarageRight);
+                
+                // Update current data
+                currentData.garageLeft = clampedGarageLeft;
+                currentData.garageFront = clampedGarageFront;
+                currentData.garageRear = Math.max(0, newGarageRear);
+                currentData.garageRight = Math.max(0, newGarageRight);
+                
+            } else if (dragMode === 'resize-garage') {
+                // Calculate size change
+                const deltaX = x - dragStartX;
+                const deltaY = y - dragStartY;
+                
+                // Convert to lot units
+                const deltaLength = Math.round(deltaX / canvasScale);
+                const deltaWidth = Math.round(deltaY / canvasScale);
+                
+                // Calculate new dimensions
+                const currentLength = parseInt(currentData.garageLength);
+                const currentWidth = parseInt(currentData.garageWidth);
+                
+                const newLength = Math.max(8, currentLength + deltaLength); // Min 8ft for garage
+                const newWidth = Math.max(8, currentWidth + deltaWidth); // Min 8ft for garage
+                
+                // Check if new size fits on lot
+                const garageLeft = parseInt(currentData.garageLeft);
+                const garageFront = parseInt(currentData.garageFront);
+                
+                const maxLength = lotLength - garageLeft;
+                const maxWidth = lotWidth - garageFront;
+                
+                const clampedLength = Math.min(maxLength, newLength);
+                const clampedWidth = Math.min(maxWidth, newWidth);
+                
+                // Update form fields
+                document.getElementById('garageLength').value = clampedLength;
+                document.getElementById('garageWidth').value = clampedWidth;
+                
+                // Update current data
+                currentData.garageLength = clampedLength;
+                currentData.garageWidth = clampedWidth;
+                
+                // Recalculate positions
+                const newGarageRear = lotWidth - garageFront - clampedWidth;
+                const newGarageRight = lotLength - garageLeft - clampedLength;
+                
+                document.getElementById('garageRear').value = Math.max(0, newGarageRear);
+                document.getElementById('garageRight').value = Math.max(0, newGarageRight);
+                
+                currentData.garageRear = Math.max(0, newGarageRear);
+                currentData.garageRight = Math.max(0, newGarageRight);
+                
+                // Update drag start for smooth resizing
+                dragStartX = x;
+                dragStartY = y;
+            }
             
             // Redraw diagram and update compliance
             drawLotDiagram(currentData);
@@ -895,26 +1335,26 @@
         function updateComplianceFromData() {
             if (!currentData) return;
             
-            // Create a temporary form data object
-            const tempData = new FormData();
-            Object.keys(currentData).forEach(key => {
-                tempData.append(key, currentData[key]);
-            });
+            // Run the FULL compliance check with all Saint Paul rules
+            runFullComplianceCheck(currentData);
+        }
+        
+        function runFullComplianceCheck(data) {
+            const saunaArea = parseInt(data.saunaLength) * parseInt(data.saunaWidth);
+            const lotArea = parseInt(data.lotLength) * parseInt(data.lotWidth);
             
-            // Run compliance check with updated data
-            const results = [];
+            let results = [];
             let overallCompliant = true;
             
-            const saunaArea = parseInt(currentData.saunaLength) * parseInt(currentData.saunaWidth);
+            // Check setbacks (3ft minimum for Saint Paul)
             const minSetback = 3;
             const setbacks = {
-                rear: parseInt(currentData.rearSetback),
-                left: parseInt(currentData.leftSetback),
-                right: parseInt(currentData.rightSetback),
-                front: parseInt(currentData.frontSetback)
+                rear: parseInt(data.rearSetback),
+                left: parseInt(data.leftSetback),
+                right: parseInt(data.rightSetback),
+                front: parseInt(data.frontSetback)
             };
             
-            // Quick compliance check for live updates
             Object.entries(setbacks).forEach(([side, distance]) => {
                 if (distance < minSetback) {
                     results.push({
@@ -930,8 +1370,188 @@
                 }
             });
             
+            // Check size for permit requirements (120 sq ft threshold for Saint Paul)
+            if (saunaArea > 120) {
+                results.push({
+                    type: 'info',
+                    message: `📋 Size: ${saunaArea} sq ft - Building permit required (over 120 sq ft in Saint Paul)`
+                });
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Size: ${saunaArea} sq ft - No building permit required (under 120 sq ft in Saint Paul)`
+                });
+            }
+            
+            // Check height restrictions (15ft max for Saint Paul)
+            const saunaHeight = parseInt(data.saunaHeight);
+            if (saunaHeight > 15) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Height: ${saunaHeight}ft exceeds Saint Paul's 15ft limit for accessory structures`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Height: ${saunaHeight}ft complies with Saint Paul's 15ft limit`
+                });
+            }
+            
+            // Check maximum size limit (1,000 sq ft max for Saint Paul)
+            if (saunaArea > 1000) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Size: ${saunaArea} sq ft exceeds Saint Paul's 1,000 sq ft limit for individual accessory buildings`
+                });
+                overallCompliant = false;
+            }
+            
+            // Check garage spacing (6ft minimum between structures)
+            if (data.hasGarage === 'yes') {
+                const garageLength = parseInt(data.garageLength) || 0;
+                const garageWidth = parseInt(data.garageWidth) || 0;
+                const garageFront = parseInt(data.garageFront) || 0;
+                const garageLeft = parseInt(data.garageLeft) || 0;
+                
+                // Calculate garage boundaries
+                const garageRightEdge = garageLeft + garageLength;
+                const garageBottomEdge = garageFront + garageWidth;
+                
+                // Calculate sauna boundaries  
+                const leftSetback = parseInt(data.leftSetback);
+                const frontSetback = parseInt(data.frontSetback);
+                const saunaRightEdge = leftSetback + parseInt(data.saunaLength);
+                const saunaBottomEdge = frontSetback + parseInt(data.saunaWidth);
+                
+                // Check minimum distance between rectangles (need 6ft between them)
+                let tooClose = false;
+                let distanceIssue = '';
+                let minDistance = Infinity;
+                
+                // Check for overlap first
+                const horizontalOverlap = saunaRightEdge > garageLeft && leftSetback < garageRightEdge;
+                const verticalOverlap = saunaBottomEdge > garageFront && frontSetback < garageBottomEdge;
+                
+                if (horizontalOverlap && verticalOverlap) {
+                    // Structures are overlapping!
+                    tooClose = true;
+                    distanceIssue = 'OVERLAPPING';
+                } else {
+                    // Calculate minimum distance between non-overlapping rectangles
+                    if (horizontalOverlap) {
+                        // Horizontally aligned, check vertical distance
+                        if (frontSetback >= garageBottomEdge) {
+                            minDistance = frontSetback - garageBottomEdge;
+                        } else {
+                            minDistance = garageFront - saunaBottomEdge;
+                        }
+                    } else if (verticalOverlap) {
+                        // Vertically aligned, check horizontal distance  
+                        if (leftSetback >= garageRightEdge) {
+                            minDistance = leftSetback - garageRightEdge;
+                        } else {
+                            minDistance = garageLeft - saunaRightEdge;
+                        }
+                    } else {
+                        // Diagonally separated, calculate corner-to-corner distance
+                        const horizontalGap = Math.max(0, Math.max(garageLeft - saunaRightEdge, leftSetback - garageRightEdge));
+                        const verticalGap = Math.max(0, Math.max(garageFront - saunaBottomEdge, frontSetback - garageBottomEdge));
+                        minDistance = Math.sqrt(horizontalGap * horizontalGap + verticalGap * verticalGap);
+                    }
+                    
+                    if (minDistance < 6) {
+                        tooClose = true;
+                        distanceIssue = `${minDistance.toFixed(1)}ft apart`;
+                    }
+                }
+                
+                if (tooClose) {
+                    results.push({
+                        type: 'fail',
+                        message: `❌ Garage spacing: Sauna is ${distanceIssue} from existing garage (needs 6ft minimum per Saint Paul code)`
+                    });
+                    overallCompliant = false;
+                } else {
+                    results.push({
+                        type: 'pass',
+                        message: `✅ Garage spacing: Adequate distance from existing structures`
+                    });
+                }
+            }
+            
+            // Check distance from main house (6ft minimum per Saint Paul)
+            const houseFront = parseInt(data.houseFront) || 0;
+            const houseLeft = parseInt(data.houseLeft) || 0;
+            const houseLength = parseInt(data.houseLength) || 0;
+            const houseWidth = parseInt(data.houseWidth) || 0;
+            
+            const houseRightEdge = houseLeft + houseLength;
+            const houseBottomEdge = houseFront + houseWidth;
+            
+            const leftSetback = parseInt(data.leftSetback);
+            const frontSetback = parseInt(data.frontSetback);
+            const saunaRightEdge = leftSetback + parseInt(data.saunaLength);
+            const saunaBottomEdge = frontSetback + parseInt(data.saunaWidth);
+            
+            // Calculate minimum distance from house
+            let houseDistance = Infinity;
+            const houseHorizontalOverlap = saunaRightEdge > houseLeft && leftSetback < houseRightEdge;
+            const houseVerticalOverlap = saunaBottomEdge > houseFront && frontSetback < houseBottomEdge;
+            
+            if (houseHorizontalOverlap && houseVerticalOverlap) {
+                houseDistance = 0; // Overlapping
+            } else if (houseHorizontalOverlap) {
+                houseDistance = Math.min(
+                    Math.abs(frontSetback - houseBottomEdge),
+                    Math.abs(saunaBottomEdge - houseFront)
+                );
+            } else if (houseVerticalOverlap) {
+                houseDistance = Math.min(
+                    Math.abs(leftSetback - houseRightEdge),
+                    Math.abs(saunaRightEdge - houseLeft)
+                );
+            } else {
+                const horizGap = Math.max(0, Math.max(houseLeft - saunaRightEdge, leftSetback - houseRightEdge));
+                const vertGap = Math.max(0, Math.max(houseFront - saunaBottomEdge, frontSetback - houseBottomEdge));
+                houseDistance = Math.sqrt(horizGap * horizGap + vertGap * vertGap);
+            }
+            
+            if (houseDistance < 6) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ House distance: ${houseDistance === 0 ? 'OVERLAPPING' : houseDistance.toFixed(1) + 'ft'} from main house (needs 6ft minimum per Saint Paul code)`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ House distance: ${houseDistance.toFixed(1)}ft from main house (compliant)`
+                });
+            }
+            
+            // Check total accessory building area (1,200 sq ft max per Saint Paul)
+            let totalAccessoryArea = saunaArea;
+            if (data.hasGarage === 'yes') {
+                const garageArea = parseInt(data.garageLength) * parseInt(data.garageWidth);
+                totalAccessoryArea += garageArea;
+            }
+            
+            if (totalAccessoryArea > 1200) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Total accessory area: ${totalAccessoryArea} sq ft exceeds Saint Paul's 1,200 sq ft combined limit`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Total accessory area: ${totalAccessoryArea} sq ft (within 1,200 sq ft Saint Paul limit)`
+                });
+            }
+            
             // Update results display
-            displayResults(results, overallCompliant, currentData);
+            displayResults(results, overallCompliant, data);
         }
         
         function displayResults(results, compliant, data) {
