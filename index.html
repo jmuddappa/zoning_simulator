@@ -1044,10 +1044,11 @@
         }
         
         function drawResizeHandles(ctx, x, y, w, h, color) {
-            const handleSize = 20; // Much larger for mobile
+            const isMobile = window.innerWidth <= 768;
+            const handleSize = isMobile ? 25 : 20; // Even larger for mobile
             ctx.fillStyle = color;
             ctx.strokeStyle = 'white';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = isMobile ? 4 : 3;
             
             // Corner handles - positioned at actual corners
             const handles = [
@@ -1126,35 +1127,49 @@
             e.preventDefault();
             const touch = e.touches[0];
             
-            // Direct touch handling for better mobile support
             if (!currentData) return;
             
-            const rect = e.target.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
             
-            console.log('Touch start at:', x, y);
+            // Account for canvas scaling on mobile
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
             
-            // Check for resize handles first with larger hit area
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
+            
+            console.log('Touch start - clientX:', touch.clientX, 'clientY:', touch.clientY);
+            console.log('Rect - left:', rect.left, 'top:', rect.top, 'width:', rect.width, 'height:', rect.height);
+            console.log('Canvas - width:', canvas.width, 'height:', canvas.height);
+            console.log('Scale - X:', scaleX, 'Y:', scaleY);
+            console.log('Final coordinates:', x, y);
+            
+            // Check for resize handles first
             const resizeInfo = checkResizeHandles(x, y);
             if (resizeInfo) {
-                console.log('Touch resize handle:', resizeInfo);
+                console.log('✅ Touch resize handle found:', resizeInfo);
                 isResizing = true;
                 resizeTarget = resizeInfo.target;
                 resizeHandle = resizeInfo.handle;
                 dragStartX = x;
                 dragStartY = y;
+                // Add visual feedback
+                canvas.style.cursor = resizeInfo.cursor;
                 return;
             }
             
             // Check for structure drag
             const clickedStructure = getClickedStructure(x, y);
             if (clickedStructure) {
-                console.log('Touch structure:', clickedStructure.type);
+                console.log('✅ Touch structure found:', clickedStructure.type);
                 isDragging = true;
                 dragTarget = clickedStructure.type;
                 dragStartX = x - clickedStructure.x;
                 dragStartY = y - clickedStructure.y;
+                canvas.style.cursor = 'grabbing';
+            } else {
+                console.log('❌ No structure found at touch point');
             }
         }
         
@@ -1164,13 +1179,21 @@
             if ((!isDragging && !isResizing) || !currentData) return;
             
             const touch = e.touches[0];
-            const rect = e.target.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Account for canvas scaling on mobile
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
             
             if (isResizing) {
+                console.log('Touch move - resizing', resizeTarget, resizeHandle);
                 handleResize(x, y);
             } else if (isDragging) {
+                console.log('Touch move - dragging', dragTarget);
                 handleDrag(x, y);
             }
         }
@@ -1179,20 +1202,28 @@
             e.preventDefault();
             
             if (isDragging || isResizing) {
+                console.log('Touch end - was', isDragging ? 'dragging' : 'resizing');
                 isDragging = false;
                 isResizing = false;
                 dragTarget = null;
                 resizeTarget = null;
                 resizeHandle = null;
+                e.target.style.cursor = 'grab';
             }
         }
         
         function handleMouseDown(e) {
             if (!currentData) return;
             
-            const rect = e.target.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Account for canvas scaling
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
             
             // Check for resize handle clicks first
             const resizeInfo = checkResizeHandles(x, y);
@@ -1273,8 +1304,9 @@
         function checkResizeHandles(x, y) {
             if (!currentData) return null;
             
-            const handleSize = 20; // Match drawing size
-            const hitRadius = handleSize * 1.5; // Much larger hit area for mobile
+            const isMobile = window.innerWidth <= 768;
+            const handleSize = isMobile ? 25 : 20; // Match drawing size
+            const hitRadius = isMobile ? handleSize * 2 : handleSize * 1.5; // Huge hit area for mobile
             
             // Check sauna handles
             const saunaX = canvasOffsetX + (parseInt(currentData.leftSetback) * canvasScale);
@@ -1293,7 +1325,9 @@
                 const distance = Math.sqrt(
                     Math.pow(x - handle.pos[0], 2) + Math.pow(y - handle.pos[1], 2)
                 );
+                console.log(`Sauna handle ${handle.handle} at (${handle.pos[0]}, ${handle.pos[1]}), distance: ${distance}, hitRadius: ${hitRadius}`);
                 if (distance <= hitRadius) {
+                    console.log(`✅ HIT! Sauna handle ${handle.handle}`);
                     return {target: 'sauna', handle: handle.handle, cursor: handle.cursor};
                 }
             }
@@ -1364,9 +1398,15 @@
         function handleMouseMove(e) {
             if ((!isDragging && !isResizing) || !currentData) return;
             
-            const rect = e.target.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Account for canvas scaling
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
             
             if (isResizing) {
                 handleResize(x, y);
