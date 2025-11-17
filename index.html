@@ -443,7 +443,8 @@
                     <span><span style="color: #17a2b8;">■</span> Main house</span>
                 </div>
                 <div class="mobile-instructions">
-                    📱 Tap and drag the sauna to see live compliance updates!
+                    <span style="color: #2563eb; font-weight: bold;">🔄 Tap & drag structures to move</span> • 
+                    <span style="color: #dc2626; font-weight: bold;">🔲 Tap large corner circles to resize</span>
                 </div>
             </div>
             <div id="resultContent"></div>
@@ -867,6 +868,10 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('HOUSE', houseX + houseW/2, houseY + houseH/2 + 3);
                 
+                // Draw dimension labels for house
+                drawDimensionLabels(ctx, houseX, houseY, houseW, houseH, 
+                    houseLength, houseWidth, '#17a2b8');
+                
                 // Draw resize handles for house
                 drawResizeHandles(ctx, houseX, houseY, houseW, houseH, '#17a2b8');
             }
@@ -901,6 +906,10 @@
                     ctx.textAlign = 'center';
                     ctx.fillText('GARAGE', garageX + garageW/2, garageY + garageH/2 + 3);
                     
+                    // Draw dimension labels for garage
+                    drawDimensionLabels(ctx, garageX, garageY, garageW, garageH, 
+                        clampedGarageLength, clampedGarageWidth, '#6c757d');
+                    
                     // Draw resize handles for garage
                     drawResizeHandles(ctx, garageX, garageY, garageW, garageH, '#6c757d');
                 }
@@ -927,15 +936,71 @@
             ctx.textAlign = 'center';
             ctx.fillText('SAUNA', saunaX + saunaW/2, saunaY + saunaH/2 + 3);
             
+            // Draw dimension labels for sauna
+            drawDimensionLabels(ctx, saunaX, saunaY, saunaW, saunaH, 
+                parseInt(data.saunaLength), parseInt(data.saunaWidth), '#007bff');
+            
             // Draw resize handles for sauna
             drawResizeHandles(ctx, saunaX, saunaY, saunaW, saunaH, '#007bff');
         }
         
+        function drawDimensionLabels(ctx, x, y, w, h, lengthFt, widthFt, color) {
+            ctx.save();
+            
+            // Style for dimension labels
+            ctx.font = 'bold 11px Arial';
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Top edge - length
+            const topText = `${lengthFt}'`;
+            const topX = x + w/2;
+            const topY = y - 8;
+            
+            // Draw background box for better visibility
+            const topMetrics = ctx.measureText(topText);
+            const topBoxW = topMetrics.width + 8;
+            const topBoxH = 14;
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(topX - topBoxW/2, topY - topBoxH/2, topBoxW, topBoxH);
+            
+            ctx.fillStyle = 'white';
+            ctx.fillText(topText, topX, topY);
+            
+            // Right edge - width (rotated)
+            const rightText = `${widthFt}'`;
+            const rightX = x + w + 8;
+            const rightY = y + h/2;
+            
+            // Save context for rotation
+            ctx.save();
+            ctx.translate(rightX, rightY);
+            ctx.rotate(Math.PI / 2);
+            
+            // Draw background box
+            const rightMetrics = ctx.measureText(rightText);
+            const rightBoxW = rightMetrics.width + 8;
+            const rightBoxH = 14;
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(-rightBoxW/2, -rightBoxH/2, rightBoxW, rightBoxH);
+            
+            ctx.fillStyle = 'white';
+            ctx.fillText(rightText, 0, 0);
+            
+            ctx.restore(); // Restore rotation
+            ctx.restore(); // Restore all styles
+        }
+        
         function drawResizeHandles(ctx, x, y, w, h, color) {
-            const handleSize = 12; // Made larger
+            const handleSize = 20; // Much larger for mobile
             ctx.fillStyle = color;
             ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             
             // Corner handles - positioned at actual corners
             const handles = [
@@ -946,11 +1011,20 @@
             ];
             
             handles.forEach(([hx, hy]) => {
-                // Draw filled circle for better visibility
+                // Draw filled circle with double ring for mobile visibility
                 ctx.beginPath();
                 ctx.arc(hx + handleSize/2, hy + handleSize/2, handleSize/2, 0, 2 * Math.PI);
                 ctx.fill();
                 ctx.stroke();
+                
+                // Add inner ring for extra visibility
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(hx + handleSize/2, hy + handleSize/2, handleSize/3, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 3;
             });
         }
 
@@ -1004,27 +1078,66 @@
         function handleTouchStart(e) {
             e.preventDefault();
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            e.target.dispatchEvent(mouseEvent);
+            
+            // Direct touch handling for better mobile support
+            if (!currentData) return;
+            
+            const rect = e.target.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            console.log('Touch start at:', x, y);
+            
+            // Check for resize handles first with larger hit area
+            const resizeInfo = checkResizeHandles(x, y);
+            if (resizeInfo) {
+                console.log('Touch resize handle:', resizeInfo);
+                isResizing = true;
+                resizeTarget = resizeInfo.target;
+                resizeHandle = resizeInfo.handle;
+                dragStartX = x;
+                dragStartY = y;
+                return;
+            }
+            
+            // Check for structure drag
+            const clickedStructure = getClickedStructure(x, y);
+            if (clickedStructure) {
+                console.log('Touch structure:', clickedStructure.type);
+                isDragging = true;
+                dragTarget = clickedStructure.type;
+                dragStartX = x - clickedStructure.x;
+                dragStartY = y - clickedStructure.y;
+            }
         }
         
         function handleTouchMove(e) {
             e.preventDefault();
+            
+            if ((!isDragging && !isResizing) || !currentData) return;
+            
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            e.target.dispatchEvent(mouseEvent);
+            const rect = e.target.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            if (isResizing) {
+                handleResize(x, y);
+            } else if (isDragging) {
+                handleDrag(x, y);
+            }
         }
         
         function handleTouchEnd(e) {
             e.preventDefault();
-            const mouseEvent = new MouseEvent('mouseup', {});
-            e.target.dispatchEvent(mouseEvent);
+            
+            if (isDragging || isResizing) {
+                isDragging = false;
+                isResizing = false;
+                dragTarget = null;
+                resizeTarget = null;
+                resizeHandle = null;
+            }
         }
         
         function handleMouseDown(e) {
@@ -1113,8 +1226,8 @@
         function checkResizeHandles(x, y) {
             if (!currentData) return null;
             
-            const handleSize = 12;
-            const hitRadius = handleSize; // Larger hit area
+            const handleSize = 20; // Match drawing size
+            const hitRadius = handleSize * 1.5; // Much larger hit area for mobile
             
             // Check sauna handles
             const saunaX = canvasOffsetX + (parseInt(currentData.leftSetback) * canvasScale);
@@ -1216,6 +1329,7 @@
         }
         
         function handleResize(x, y) {
+            console.log('Resizing', resizeTarget, 'with handle', resizeHandle);
             const deltaX = (x - dragStartX) / canvasScale;
             const deltaY = (y - dragStartY) / canvasScale;
             
