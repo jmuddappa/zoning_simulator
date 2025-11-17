@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minnesota Sauna Zoning Checker</title>
+    <title>Saint Paul Sauna Zoning Checker</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -99,13 +99,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏠 Minnesota Sauna Zoning Checker</h1>
-        <p style="text-align: center; color: #666;">Check if your backyard sauna project complies with Minnesota zoning laws</p>
+        <h1>🏠 Saint Paul Sauna Zoning Checker</h1>
+        <p style="text-align: center; color: #666;">Check if your backyard sauna project complies with Saint Paul zoning ordinances</p>
         
         <form id="saunaForm">
             <div class="form-group">
-                <label for="city">City/County:</label>
-                <input type="text" id="city" name="city" placeholder="e.g., Minneapolis, Saint Paul" required>
+                <label for="city">Location:</label>
+                <input type="text" id="city" name="city" value="Saint Paul, MN" readonly style="background-color: #f8f9fa;">
             </div>
 
             <div class="form-group">
@@ -200,8 +200,8 @@
             let results = [];
             let overallCompliant = true;
             
-            // Check setbacks (10ft minimum for most MN cities)
-            const minSetback = 10;
+            // Check setbacks (3ft minimum for Saint Paul)
+            const minSetback = 3;
             const setbacks = {
                 rear: parseInt(data.rearSetback),
                 left: parseInt(data.leftSetback),
@@ -213,27 +213,27 @@
                 if (distance < minSetback) {
                     results.push({
                         type: 'fail',
-                        message: `❌ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (needs ${minSetback}ft minimum)`
+                        message: `❌ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (needs ${minSetback}ft minimum per Saint Paul ordinance)`
                     });
                     overallCompliant = false;
                 } else {
                     results.push({
                         type: 'pass',
-                        message: `✅ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (compliant)`
+                        message: `✅ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (compliant with Saint Paul rules)`
                     });
                 }
             });
             
-            // Check size for permit requirements
-            if (saunaArea > 200) {
+            // Check size for permit requirements (120 sq ft threshold for Saint Paul)
+            if (saunaArea > 120) {
                 results.push({
                     type: 'info',
-                    message: `📋 Size: ${saunaArea} sq ft - Building permit required (over 200 sq ft)`
+                    message: `📋 Size: ${saunaArea} sq ft - Building permit required (over 120 sq ft in Saint Paul)`
                 });
             } else {
                 results.push({
                     type: 'pass',
-                    message: `✅ Size: ${saunaArea} sq ft - No building permit required (under 200 sq ft)`
+                    message: `✅ Size: ${saunaArea} sq ft - No building permit required (under 120 sq ft in Saint Paul)`
                 });
             }
             
@@ -252,6 +252,30 @@
                     type: 'pass',
                     message: `✅ No special fire rating required (all setbacks > 5ft)`
                 });
+            }
+            
+            // Check height restrictions (15ft max for Saint Paul)
+            const saunaHeight = parseInt(data.saunaHeight);
+            if (saunaHeight > 15) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Height: ${saunaHeight}ft exceeds Saint Paul's 15ft limit for accessory structures`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Height: ${saunaHeight}ft complies with Saint Paul's 15ft limit`
+                });
+            }
+            
+            // Check maximum size limit (1,000 sq ft max for Saint Paul)
+            if (saunaArea > 1000) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Size: ${saunaArea} sq ft exceeds Saint Paul's 1,000 sq ft limit for individual accessory buildings`
+                });
+                overallCompliant = false;
             }
             
             // Check electrical requirements
@@ -301,7 +325,11 @@
             });
             
             html += `<div class="result-item info">
-                <strong>⚠️ Important:</strong> This is a preliminary check only. Contact your local building department at ${document.getElementById('city').value || '[your city]'} for official confirmation and permit applications.
+                <strong>⚠️ Important:</strong> This is a preliminary check based on Saint Paul zoning ordinances. For official confirmation and permit applications, contact:<br>
+                <strong>Saint Paul Department of Safety and Inspections</strong><br>
+                375 Jackson Street, Suite 220, Saint Paul, MN 55101<br>
+                Phone: <strong>651-266-8989</strong><br>
+                Use the new PAULIE online permitting system launched September 2024.
             </div>`;
             
             contentDiv.innerHTML = html;
