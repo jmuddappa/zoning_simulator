@@ -192,11 +192,11 @@
         
         /* Mobile-optimized diagram */
         .diagram-container {
-            margin: 24px 0;
+            margin: 0;
             text-align: center;
-            background: #f7fafc;
-            padding: 16px;
-            border-radius: 12px;
+            background: none;
+            padding: 0;
+            border-radius: 0;
         }
         .diagram-container h3 {
             margin: 0 0 16px 0;
@@ -204,10 +204,10 @@
             font-size: 18px;
         }
         #lotDiagram {
-            border: 2px solid #4a5568;
-            border-radius: 8px;
-            margin: 10px auto;
-            background: #fff;
+            border: 1px solid #4a5568;
+            border-radius: 0;
+            margin: 0;
+            background: #f8f9fa;
             cursor: grab;
             width: 100%;
             height: auto;
@@ -227,8 +227,8 @@
             }
             
             .diagram-container {
-                padding: 10px !important;
-                margin: 0 -10px !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
             
             .container {
@@ -477,17 +477,8 @@
             <div class="diagram-container">
                 <h3>📐 Lot Diagram</h3>
                 <canvas id="lotDiagram" width="800" height="600"></canvas>
-                <div class="legend">
-                    <span><span style="color: #dc3545;">■</span> Non-compliant area</span>
-                    <span><span style="color: #28a745;">■</span> Compliant area</span>
-                    <span><span style="color: #007bff;">■</span> Proposed sauna</span>
-                    <span><span style="color: #6c757d;">■</span> Existing garage</span>
-                    <span><span style="color: #17a2b8;">■</span> Main house</span>
-                </div>
-                <div class="mobile-instructions">
-                    <span style="color: #2563eb; font-weight: bold;">🔄 Tap & drag structures to move</span> • 
-                    <span style="color: #dc2626; font-weight: bold;">🔲 Tap large corner circles to resize</span>
-                </div>
+                <!-- Legend hidden to save space -->
+                <!-- Instructions moved to overlay on canvas -->
             </div>
             <div id="resultContent"></div>
         </div>
@@ -846,8 +837,12 @@
             
             const lotLength = parseInt(data.lotLength);
             const lotWidth = parseInt(data.lotWidth);
-            const maxDimension = Math.max(lotLength, lotWidth);
-            const scale = 360 / maxDimension;
+            
+            // Use full canvas - no white border, lot fills entire space
+            const scaleX = (canvas.width - 40) / lotLength;  // 20px margin on each side
+            const scaleY = (canvas.height - 40) / lotWidth;  // 20px margin on each side
+            const scale = Math.min(scaleX, scaleY); // Use smaller scale to maintain aspect ratio
+            
             const scaledLength = lotLength * scale;
             const scaledWidth = lotWidth * scale;
             const offsetX = (canvas.width - scaledLength) / 2;
@@ -858,9 +853,13 @@
             canvasOffsetX = offsetX;
             canvasOffsetY = offsetY;
             
-            // Draw lot boundary
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 3;
+            // Fill entire canvas as the lot (light green grass color)
+            ctx.fillStyle = '#e8f5e8';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw lot boundary with thicker border
+            ctx.strokeStyle = '#2d5a2d';
+            ctx.lineWidth = 4;
             ctx.strokeRect(offsetX, offsetY, scaledLength, scaledWidth);
             
             // Draw setback zones (non-compliant areas)
