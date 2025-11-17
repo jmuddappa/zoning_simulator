@@ -95,6 +95,15 @@
         .info {
             background-color: #d1ecf1;
         }
+        .diagram-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        #lotDiagram {
+            border: 2px solid #333;
+            margin: 10px auto;
+            background: #f8f9fa;
+        }
     </style>
 </head>
 <body>
@@ -175,15 +184,127 @@
             </div>
 
             <button type="submit">Check Zoning Compliance</button>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <h3 style="margin-bottom: 15px;">Quick Test Cases</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <button type="button" onclick="loadTestCase(0)" style="background: #28a745; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">✅ Perfect Compliance</button>
+                    <button type="button" onclick="loadTestCase(1)" style="background: #ffc107; color: black; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">⚠️ Setback Violation</button>
+                    <button type="button" onclick="loadTestCase(2)" style="background: #17a2b8; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">📋 Needs Permit</button>
+                    <button type="button" onclick="loadTestCase(3)" style="background: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">❌ Multiple Issues</button>
+                    <button type="button" onclick="loadTestCase(4)" style="background: #6f42c1; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">🏗️ Too Large</button>
+                </div>
+            </div>
         </form>
 
         <div id="results" class="results">
             <h2>Compliance Results</h2>
+            <div class="diagram-container">
+                <h3>Lot Diagram</h3>
+                <canvas id="lotDiagram" width="400" height="300"></canvas>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                    <span style="color: #dc3545;">■</span> Non-compliant area &nbsp;
+                    <span style="color: #28a745;">■</span> Compliant area &nbsp;
+                    <span style="color: #007bff;">■</span> Proposed sauna
+                </p>
+            </div>
             <div id="resultContent"></div>
         </div>
     </div>
 
     <script>
+        const testCases = [
+            {
+                name: "Perfect Compliance",
+                lotLength: 60,
+                lotWidth: 40,
+                saunaLength: 8,
+                saunaWidth: 6,
+                saunaHeight: 10,
+                frontSetback: 10,
+                rearSetback: 8,
+                leftSetback: 5,
+                rightSetback: 5,
+                foundation: "portable",
+                electrical: "basic"
+            },
+            {
+                name: "Setback Violation",
+                lotLength: 50,
+                lotWidth: 30,
+                saunaLength: 10,
+                saunaWidth: 8,
+                saunaHeight: 12,
+                frontSetback: 5,
+                rearSetback: 2,
+                leftSetback: 4,
+                rightSetback: 6,
+                foundation: "portable",
+                electrical: "none"
+            },
+            {
+                name: "Needs Permit",
+                lotLength: 100,
+                lotWidth: 80,
+                saunaLength: 12,
+                saunaWidth: 12,
+                saunaHeight: 14,
+                frontSetback: 6,
+                rearSetback: 6,
+                leftSetback: 6,
+                rightSetback: 6,
+                foundation: "permanent",
+                electrical: "heavy"
+            },
+            {
+                name: "Multiple Issues",
+                lotLength: 40,
+                lotWidth: 25,
+                saunaLength: 15,
+                saunaWidth: 10,
+                saunaHeight: 18,
+                frontSetback: 2,
+                rearSetback: 1,
+                leftSetback: 3,
+                rightSetback: 2,
+                foundation: "permanent",
+                electrical: "heavy"
+            },
+            {
+                name: "Too Large",
+                lotLength: 200,
+                lotWidth: 150,
+                saunaLength: 35,
+                saunaWidth: 30,
+                saunaHeight: 12,
+                frontSetback: 10,
+                rearSetback: 10,
+                leftSetback: 10,
+                rightSetback: 10,
+                foundation: "permanent",
+                electrical: "heavy"
+            }
+        ];
+
+        function loadTestCase(index) {
+            const testCase = testCases[index];
+            
+            document.getElementById('lotLength').value = testCase.lotLength;
+            document.getElementById('lotWidth').value = testCase.lotWidth;
+            document.getElementById('saunaLength').value = testCase.saunaLength;
+            document.getElementById('saunaWidth').value = testCase.saunaWidth;
+            document.getElementById('saunaHeight').value = testCase.saunaHeight;
+            document.getElementById('frontSetback').value = testCase.frontSetback;
+            document.getElementById('rearSetback').value = testCase.rearSetback;
+            document.getElementById('leftSetback').value = testCase.leftSetback;
+            document.getElementById('rightSetback').value = testCase.rightSetback;
+            document.getElementById('foundation').value = testCase.foundation;
+            document.getElementById('electrical').value = testCase.electrical;
+            
+            // Auto-run the compliance check
+            checkCompliance();
+        }
+
         document.getElementById('saunaForm').addEventListener('submit', function(e) {
             e.preventDefault();
             checkCompliance();
@@ -309,10 +430,126 @@
                 });
             }
             
-            displayResults(results, overallCompliant);
+            displayResults(results, overallCompliant, data);
         }
         
-        function displayResults(results, compliant) {
+        function drawLotDiagram(data) {
+            const canvas = document.getElementById('lotDiagram');
+            const ctx = canvas.getContext('2d');
+            
+            const lotLength = parseInt(data.lotLength);
+            const lotWidth = parseInt(data.lotWidth);
+            const saunaLength = parseInt(data.saunaLength);
+            const saunaWidth = parseInt(data.saunaWidth);
+            const frontSetback = parseInt(data.frontSetback);
+            const rearSetback = parseInt(data.rearSetback);
+            const leftSetback = parseInt(data.leftSetback);
+            const rightSetback = parseInt(data.rightSetback);
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Scale to fit canvas (maintain aspect ratio)
+            const maxDimension = Math.max(lotLength, lotWidth);
+            const scale = 360 / maxDimension; // Leave 20px margin on each side
+            const scaledLength = lotLength * scale;
+            const scaledWidth = lotWidth * scale;
+            
+            // Center the lot on canvas
+            const offsetX = (canvas.width - scaledLength) / 2;
+            const offsetY = (canvas.height - scaledWidth) / 2;
+            
+            // Draw lot boundary
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(offsetX, offsetY, scaledLength, scaledWidth);
+            
+            // Draw setback zones (non-compliant areas in red)
+            ctx.fillStyle = 'rgba(220, 53, 69, 0.3)'; // Red
+            
+            // Front setback (3ft minimum)
+            const frontZone = 3 * scale;
+            ctx.fillRect(offsetX, offsetY, scaledLength, frontZone);
+            
+            // Rear setback
+            const rearZone = 3 * scale;
+            ctx.fillRect(offsetX, offsetY + scaledWidth - rearZone, scaledLength, rearZone);
+            
+            // Left setback  
+            const leftZone = 3 * scale;
+            ctx.fillRect(offsetX, offsetY, leftZone, scaledWidth);
+            
+            // Right setback
+            const rightZone = 3 * scale;
+            ctx.fillRect(offsetX + scaledLength - rightZone, offsetY, rightZone, scaledWidth);
+            
+            // Draw compliant area (green)
+            ctx.fillStyle = 'rgba(40, 167, 69, 0.3)'; // Green
+            const compliantX = offsetX + leftZone;
+            const compliantY = offsetY + frontZone;
+            const compliantWidth = scaledLength - leftZone - rightZone;
+            const compliantHeight = scaledWidth - frontZone - rearZone;
+            
+            if (compliantWidth > 0 && compliantHeight > 0) {
+                ctx.fillRect(compliantX, compliantY, compliantWidth, compliantHeight);
+            }
+            
+            // Draw proposed sauna location
+            const saunaX = offsetX + (leftSetback * scale);
+            const saunaY = offsetY + (frontSetback * scale);
+            const saunaScaledLength = saunaLength * scale;
+            const saunaScaledWidth = saunaWidth * scale;
+            
+            // Check if sauna fits in the proposed location
+            if (saunaX + saunaScaledLength <= offsetX + scaledLength && 
+                saunaY + saunaScaledWidth <= offsetY + scaledWidth) {
+                
+                // Determine sauna color based on compliance
+                const isCompliant = frontSetback >= 3 && rearSetback >= 3 && 
+                                   leftSetback >= 3 && rightSetback >= 3;
+                
+                ctx.fillStyle = isCompliant ? 'rgba(0, 123, 255, 0.7)' : 'rgba(255, 193, 7, 0.7)';
+                ctx.fillRect(saunaX, saunaY, saunaScaledLength, saunaScaledWidth);
+                
+                // Add border to sauna
+                ctx.strokeStyle = isCompliant ? '#007bff' : '#ffc107';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(saunaX, saunaY, saunaScaledLength, saunaScaledWidth);
+            }
+            
+            // Add labels
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            
+            // Lot dimensions
+            ctx.fillText(`${lotLength}'`, offsetX + scaledLength/2, offsetY - 5);
+            ctx.save();
+            ctx.translate(offsetX - 15, offsetY + scaledWidth/2);
+            ctx.rotate(-Math.PI/2);
+            ctx.fillText(`${lotWidth}'`, 0, 0);
+            ctx.restore();
+            
+            // Setback labels
+            ctx.font = '10px Arial';
+            ctx.fillStyle = '#666';
+            ctx.fillText('3\' min', offsetX + scaledLength/2, offsetY + 15);
+            ctx.fillText('3\' min', offsetX + scaledLength/2, offsetY + scaledWidth - 5);
+            
+            ctx.save();
+            ctx.translate(offsetX + 15, offsetY + scaledWidth/2);
+            ctx.rotate(-Math.PI/2);
+            ctx.fillText('3\' min', 0, 0);
+            ctx.restore();
+            
+            ctx.save();
+            ctx.translate(offsetX + scaledLength - 15, offsetY + scaledWidth/2);
+            ctx.rotate(-Math.PI/2);
+            ctx.fillText('3\' min', 0, 0);
+            ctx.restore();
+        }
+        
+        function displayResults(results, compliant, data) {
             const resultsDiv = document.getElementById('results');
             const contentDiv = document.getElementById('resultContent');
             
@@ -334,6 +571,10 @@
             
             contentDiv.innerHTML = html;
             resultsDiv.style.display = 'block';
+            
+            // Draw the lot diagram
+            drawLotDiagram(data);
+            
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
         }
     </script>
