@@ -103,6 +103,10 @@
             border: 2px solid #333;
             margin: 10px auto;
             background: #f8f9fa;
+            cursor: grab;
+        }
+        #lotDiagram:active {
+            cursor: grabbing;
         }
     </style>
 </head>
@@ -183,6 +187,48 @@
                 </select>
             </div>
 
+            <div class="form-group">
+                <label for="hasGarage">Existing Garage/Structures:</label>
+                <select id="hasGarage" name="hasGarage" onchange="toggleGarageFields()" required>
+                    <option value="no">No existing structures</option>
+                    <option value="yes" selected>Has garage or other structures</option>
+                </select>
+            </div>
+
+            <div id="garageFields" style="display: block;">
+                <div class="form-group">
+                    <label>Garage/Structure Dimensions (feet):</label>
+                    <div class="row">
+                        <div class="col">
+                            <input type="number" id="garageLength" name="garageLength" placeholder="Length">
+                        </div>
+                        <div class="col">
+                            <input type="number" id="garageWidth" name="garageWidth" placeholder="Width">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Garage Distance from Property Lines (feet):</label>
+                    <div class="row">
+                        <div class="col">
+                            <input type="number" id="garageFront" name="garageFront" placeholder="From front">
+                        </div>
+                        <div class="col">
+                            <input type="number" id="garageRear" name="garageRear" placeholder="From rear">
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top: 15px;">
+                        <div class="col">
+                            <input type="number" id="garageLeft" name="garageLeft" placeholder="From left side">
+                        </div>
+                        <div class="col">
+                            <input type="number" id="garageRight" name="garageRight" placeholder="From right side">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button type="submit">Check Zoning Compliance</button>
             
             <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
@@ -191,8 +237,9 @@
                     <button type="button" onclick="loadTestCase(0)" style="background: #28a745; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">✅ Perfect Compliance</button>
                     <button type="button" onclick="loadTestCase(1)" style="background: #ffc107; color: black; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">⚠️ Setback Violation</button>
                     <button type="button" onclick="loadTestCase(2)" style="background: #17a2b8; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">📋 Needs Permit</button>
-                    <button type="button" onclick="loadTestCase(3)" style="background: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">❌ Multiple Issues</button>
-                    <button type="button" onclick="loadTestCase(4)" style="background: #6f42c1; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">🏗️ Too Large</button>
+                    <button type="button" onclick="loadTestCase(3)" style="background: #fd7e14; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">🏠 Too Close to Garage</button>
+                    <button type="button" onclick="loadTestCase(4)" style="background: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">❌ Multiple Issues</button>
+                    <button type="button" onclick="loadTestCase(5)" style="background: #6f42c1; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">🏗️ Too Large</button>
                 </div>
             </div>
         </form>
@@ -205,7 +252,11 @@
                 <p style="font-size: 12px; color: #666; margin-top: 5px;">
                     <span style="color: #dc3545;">■</span> Non-compliant area &nbsp;
                     <span style="color: #28a745;">■</span> Compliant area &nbsp;
-                    <span style="color: #007bff;">■</span> Proposed sauna
+                    <span style="color: #007bff;">■</span> Proposed sauna &nbsp;
+                    <span style="color: #6c757d;">■</span> Existing garage
+                </p>
+                <p style="font-size: 11px; color: #666; font-style: italic;">
+                    💡 Click and drag the sauna to see live compliance updates!
                 </p>
             </div>
             <div id="resultContent"></div>
@@ -213,6 +264,15 @@
     </div>
 
     <script>
+        // Interactive diagram variables
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let currentData = null;
+        let canvasScale = 1;
+        let canvasOffsetX = 0;
+        let canvasOffsetY = 0;
+        
         const testCases = [
             {
                 name: "Perfect Compliance",
@@ -226,7 +286,14 @@
                 leftSetback: 5,
                 rightSetback: 5,
                 foundation: "portable",
-                electrical: "basic"
+                electrical: "basic",
+                hasGarage: "yes",
+                garageLength: 20,
+                garageWidth: 20,
+                garageFront: 5,
+                garageRear: 15,
+                garageLeft: 35,
+                garageRight: 5
             },
             {
                 name: "Setback Violation",
@@ -240,7 +307,14 @@
                 leftSetback: 4,
                 rightSetback: 6,
                 foundation: "portable",
-                electrical: "none"
+                electrical: "none",
+                hasGarage: "yes",
+                garageLength: 20,
+                garageWidth: 20,
+                garageFront: 5,
+                garageRear: 5,
+                garageLeft: 25,
+                garageRight: 5
             },
             {
                 name: "Needs Permit",
@@ -254,7 +328,35 @@
                 leftSetback: 6,
                 rightSetback: 6,
                 foundation: "permanent",
-                electrical: "heavy"
+                electrical: "heavy",
+                hasGarage: "yes",
+                garageLength: 20,
+                garageWidth: 20,
+                garageFront: 25,
+                garageRear: 35,
+                garageLeft: 5,
+                garageRight: 55
+            },
+            {
+                name: "Too Close to Garage",
+                lotLength: 80,
+                lotWidth: 50,
+                saunaLength: 10,
+                saunaWidth: 8,
+                saunaHeight: 12,
+                frontSetback: 15,
+                rearSetback: 27,
+                leftSetback: 25,
+                rightSetback: 45,
+                foundation: "portable",
+                electrical: "basic",
+                hasGarage: "yes",
+                garageLength: 24,
+                garageWidth: 20,
+                garageFront: 10,
+                garageRear: 20,
+                garageLeft: 5,
+                garageRight: 51
             },
             {
                 name: "Multiple Issues",
@@ -268,7 +370,14 @@
                 leftSetback: 3,
                 rightSetback: 2,
                 foundation: "permanent",
-                electrical: "heavy"
+                electrical: "heavy",
+                hasGarage: "yes",
+                garageLength: 20,
+                garageWidth: 20,
+                garageFront: 2,
+                garageRear: 3,
+                garageLeft: 18,
+                garageRight: 2
             },
             {
                 name: "Too Large",
@@ -282,9 +391,22 @@
                 leftSetback: 10,
                 rightSetback: 10,
                 foundation: "permanent",
-                electrical: "heavy"
+                electrical: "heavy",
+                hasGarage: "yes",
+                garageLength: 24,
+                garageWidth: 24,
+                garageFront: 25,
+                garageRear: 101,
+                garageLeft: 50,
+                garageRight: 126
             }
         ];
+
+        function toggleGarageFields() {
+            const hasGarage = document.getElementById('hasGarage').value;
+            const garageFields = document.getElementById('garageFields');
+            garageFields.style.display = hasGarage === 'yes' ? 'block' : 'none';
+        }
 
         function loadTestCase(index) {
             const testCase = testCases[index];
@@ -300,6 +422,23 @@
             document.getElementById('rightSetback').value = testCase.rightSetback;
             document.getElementById('foundation').value = testCase.foundation;
             document.getElementById('electrical').value = testCase.electrical;
+            
+            // Handle garage fields
+            if (testCase.hasGarage) {
+                document.getElementById('hasGarage').value = testCase.hasGarage;
+                toggleGarageFields();
+                if (testCase.hasGarage === 'yes') {
+                    document.getElementById('garageLength').value = testCase.garageLength || '';
+                    document.getElementById('garageWidth').value = testCase.garageWidth || '';
+                    document.getElementById('garageFront').value = testCase.garageFront || '';
+                    document.getElementById('garageRear').value = testCase.garageRear || '';
+                    document.getElementById('garageLeft').value = testCase.garageLeft || '';
+                    document.getElementById('garageRight').value = testCase.garageRight || '';
+                }
+            } else {
+                document.getElementById('hasGarage').value = 'no';
+                toggleGarageFields();
+            }
             
             // Auto-run the compliance check
             checkCompliance();
@@ -399,6 +538,54 @@
                 overallCompliant = false;
             }
             
+            // Check garage spacing (6ft minimum between structures)
+            if (data.hasGarage === 'yes') {
+                const garageLength = parseInt(data.garageLength) || 0;
+                const garageWidth = parseInt(data.garageWidth) || 0;
+                const garageFront = parseInt(data.garageFront) || 0;
+                const garageRear = parseInt(data.garageRear) || 0;
+                const garageLeft = parseInt(data.garageLeft) || 0;
+                const garageRight = parseInt(data.garageRight) || 0;
+                
+                // Calculate garage boundaries
+                const garageRightEdge = garageLeft + garageLength;
+                const garageBottomEdge = garageFront + garageWidth;
+                
+                // Calculate sauna boundaries  
+                const saunaRightEdge = leftSetback + parseInt(data.saunaLength);
+                const saunaBottomEdge = frontSetback + parseInt(data.saunaWidth);
+                
+                // Check if structures are too close (need 6ft between them)
+                let tooClose = false;
+                let distanceIssue = '';
+                
+                // Horizontal spacing check
+                if ((saunaRightEdge > garageLeft && leftSetback < garageRightEdge)) {
+                    // Overlapping horizontally, check vertical distance
+                    const verticalGap = Math.min(
+                        Math.abs(frontSetback - garageBottomEdge),
+                        Math.abs(saunaBottomEdge - garageFront)
+                    );
+                    if (verticalGap < 6) {
+                        tooClose = true;
+                        distanceIssue = `${verticalGap.toFixed(1)}ft apart vertically`;
+                    }
+                }
+                
+                if (tooClose) {
+                    results.push({
+                        type: 'fail',
+                        message: `❌ Garage spacing: Sauna is ${distanceIssue} from existing garage (needs 6ft minimum per Saint Paul code)`
+                    });
+                    overallCompliant = false;
+                } else {
+                    results.push({
+                        type: 'pass',
+                        message: `✅ Garage spacing: Adequate distance from existing structures`
+                    });
+                }
+            }
+            
             // Check electrical requirements
             if (data.electrical !== 'none') {
                 results.push({
@@ -422,12 +609,39 @@
                 message: `📏 Sauna adds ${coveragePercent}% to lot coverage (check local limits)`
             });
             
-            // Suggestions for non-compliant items
+            // "Fix It" suggestions for non-compliant items
             if (!overallCompliant) {
-                results.push({
-                    type: 'info',
-                    message: `💡 Suggestions: Move sauna further from property lines, or consider a smaller size that fits setback requirements.`
-                });
+                let suggestions = [];
+                
+                // Setback suggestions
+                if (frontSetback < 3) suggestions.push(`Move ${3 - frontSetback}ft away from front property line`);
+                if (rearSetback < 3) suggestions.push(`Move ${3 - rearSetback}ft away from rear property line`);
+                if (leftSetback < 3) suggestions.push(`Move ${3 - leftSetback}ft away from left property line`);
+                if (rightSetback < 3) suggestions.push(`Move ${3 - rightSetback}ft away from right property line`);
+                
+                // Height suggestions
+                if (saunaHeight > 15) suggestions.push(`Reduce height by ${saunaHeight - 15}ft (max 15ft allowed)`);
+                
+                // Size suggestions
+                if (saunaArea > 1000) suggestions.push(`Reduce size by ${saunaArea - 1000} sq ft (max 1,000 sq ft)`);
+                
+                // Optimal placement suggestion
+                const optimalLeft = Math.max(3, leftSetback);
+                const optimalFront = Math.max(3, frontSetback);
+                const lotLength = parseInt(data.lotLength);
+                const lotWidth = parseInt(data.lotWidth);
+                
+                if (optimalLeft + parseInt(data.saunaLength) + 3 <= lotLength && 
+                    optimalFront + parseInt(data.saunaWidth) + 3 <= lotWidth) {
+                    suggestions.push(`🎯 OPTIMAL: Place sauna at ${optimalLeft}ft from left, ${optimalFront}ft from front for full compliance`);
+                }
+                
+                if (suggestions.length > 0) {
+                    results.push({
+                        type: 'info',
+                        message: `🔧 Fix It Suggestions:\n• ${suggestions.join('\n• ')}`
+                    });
+                }
             }
             
             displayResults(results, overallCompliant, data);
@@ -458,6 +672,11 @@
             // Center the lot on canvas
             const offsetX = (canvas.width - scaledLength) / 2;
             const offsetY = (canvas.height - scaledWidth) / 2;
+            
+            // Store for interactive functionality
+            canvasScale = scale;
+            canvasOffsetX = offsetX;
+            canvasOffsetY = offsetY;
             
             // Draw lot boundary
             ctx.strokeStyle = '#333';
@@ -494,6 +713,37 @@
                 ctx.fillRect(compliantX, compliantY, compliantWidth, compliantHeight);
             }
             
+            // Draw existing garage if present
+            if (data.hasGarage === 'yes') {
+                const garageLength = parseInt(data.garageLength) || 0;
+                const garageWidth = parseInt(data.garageWidth) || 0;
+                const garageFront = parseInt(data.garageFront) || 0;
+                const garageLeft = parseInt(data.garageLeft) || 0;
+                
+                const garageX = offsetX + (garageLeft * scale);
+                const garageY = offsetY + (garageFront * scale);
+                const garageScaledLength = garageLength * scale;
+                const garageScaledWidth = garageWidth * scale;
+                
+                if (garageX + garageScaledLength <= offsetX + scaledLength && 
+                    garageY + garageScaledWidth <= offsetY + scaledWidth) {
+                    
+                    // Draw garage in gray
+                    ctx.fillStyle = 'rgba(108, 117, 125, 0.7)';
+                    ctx.fillRect(garageX, garageY, garageScaledLength, garageScaledWidth);
+                    
+                    ctx.strokeStyle = '#6c757d';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(garageX, garageY, garageScaledLength, garageScaledWidth);
+                    
+                    // Add garage label
+                    ctx.fillStyle = 'white';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('GARAGE', garageX + garageScaledLength/2, garageY + garageScaledWidth/2 + 3);
+                }
+            }
+
             // Draw proposed sauna location
             const saunaX = offsetX + (leftSetback * scale);
             const saunaY = offsetY + (frontSetback * scale);
@@ -515,6 +765,12 @@
                 ctx.strokeStyle = isCompliant ? '#007bff' : '#ffc107';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(saunaX, saunaY, saunaScaledLength, saunaScaledWidth);
+                
+                // Add sauna label
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('SAUNA', saunaX + saunaScaledLength/2, saunaY + saunaScaledWidth/2 + 3);
             }
             
             // Add labels
@@ -549,9 +805,141 @@
             ctx.restore();
         }
         
+        function setupCanvasInteraction() {
+            const canvas = document.getElementById('lotDiagram');
+            
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseUp);
+        }
+        
+        function handleMouseDown(e) {
+            if (!currentData) return;
+            
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Check if click is on sauna
+            const saunaX = canvasOffsetX + (parseInt(currentData.leftSetback) * canvasScale);
+            const saunaY = canvasOffsetY + (parseInt(currentData.frontSetback) * canvasScale);
+            const saunaWidth = parseInt(currentData.saunaLength) * canvasScale;
+            const saunaHeight = parseInt(currentData.saunaWidth) * canvasScale;
+            
+            if (x >= saunaX && x <= saunaX + saunaWidth && 
+                y >= saunaY && y <= saunaY + saunaHeight) {
+                isDragging = true;
+                dragStartX = x - saunaX;
+                dragStartY = y - saunaY;
+                e.target.style.cursor = 'grabbing';
+            }
+        }
+        
+        function handleMouseMove(e) {
+            if (!isDragging || !currentData) return;
+            
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Calculate new sauna position
+            const newSaunaX = x - dragStartX;
+            const newSaunaY = y - dragStartY;
+            
+            // Convert back to lot coordinates
+            const newLeftSetback = Math.max(0, Math.round((newSaunaX - canvasOffsetX) / canvasScale));
+            const newFrontSetback = Math.max(0, Math.round((newSaunaY - canvasOffsetY) / canvasScale));
+            
+            // Ensure sauna stays within lot boundaries
+            const lotLength = parseInt(currentData.lotLength);
+            const lotWidth = parseInt(currentData.lotWidth);
+            const saunaLength = parseInt(currentData.saunaLength);
+            const saunaWidth = parseInt(currentData.saunaWidth);
+            
+            const maxLeftSetback = lotLength - saunaLength;
+            const maxFrontSetback = lotWidth - saunaWidth;
+            
+            const clampedLeftSetback = Math.min(maxLeftSetback, newLeftSetback);
+            const clampedFrontSetback = Math.min(maxFrontSetback, newFrontSetback);
+            
+            // Update form fields
+            document.getElementById('leftSetback').value = clampedLeftSetback;
+            document.getElementById('frontSetback').value = clampedFrontSetback;
+            
+            // Calculate rear and right setbacks
+            const newRearSetback = lotWidth - clampedFrontSetback - saunaWidth;
+            const newRightSetback = lotLength - clampedLeftSetback - saunaLength;
+            
+            document.getElementById('rearSetback').value = Math.max(0, newRearSetback);
+            document.getElementById('rightSetback').value = Math.max(0, newRightSetback);
+            
+            // Update current data
+            currentData.leftSetback = clampedLeftSetback;
+            currentData.frontSetback = clampedFrontSetback;
+            currentData.rearSetback = Math.max(0, newRearSetback);
+            currentData.rightSetback = Math.max(0, newRightSetback);
+            
+            // Redraw diagram and update compliance
+            drawLotDiagram(currentData);
+            updateComplianceFromData();
+        }
+        
+        function handleMouseUp(e) {
+            if (isDragging) {
+                isDragging = false;
+                e.target.style.cursor = 'grab';
+            }
+        }
+        
+        function updateComplianceFromData() {
+            if (!currentData) return;
+            
+            // Create a temporary form data object
+            const tempData = new FormData();
+            Object.keys(currentData).forEach(key => {
+                tempData.append(key, currentData[key]);
+            });
+            
+            // Run compliance check with updated data
+            const results = [];
+            let overallCompliant = true;
+            
+            const saunaArea = parseInt(currentData.saunaLength) * parseInt(currentData.saunaWidth);
+            const minSetback = 3;
+            const setbacks = {
+                rear: parseInt(currentData.rearSetback),
+                left: parseInt(currentData.leftSetback),
+                right: parseInt(currentData.rightSetback),
+                front: parseInt(currentData.frontSetback)
+            };
+            
+            // Quick compliance check for live updates
+            Object.entries(setbacks).forEach(([side, distance]) => {
+                if (distance < minSetback) {
+                    results.push({
+                        type: 'fail',
+                        message: `❌ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (needs ${minSetback}ft minimum per Saint Paul ordinance)`
+                    });
+                    overallCompliant = false;
+                } else {
+                    results.push({
+                        type: 'pass',
+                        message: `✅ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (compliant with Saint Paul rules)`
+                    });
+                }
+            });
+            
+            // Update results display
+            displayResults(results, overallCompliant, currentData);
+        }
+        
         function displayResults(results, compliant, data) {
             const resultsDiv = document.getElementById('results');
             const contentDiv = document.getElementById('resultContent');
+            
+            // Store data for interactive functionality
+            currentData = data;
             
             resultsDiv.className = `results ${compliant ? 'compliant' : 'non-compliant'}`;
             
@@ -574,6 +962,13 @@
             
             // Draw the lot diagram
             drawLotDiagram(data);
+            
+            // Setup interactive functionality (only once)
+            const canvas = document.getElementById('lotDiagram');
+            if (!canvas.hasAttribute('data-interactive')) {
+                setupCanvasInteraction();
+                canvas.setAttribute('data-interactive', 'true');
+            }
             
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
         }
