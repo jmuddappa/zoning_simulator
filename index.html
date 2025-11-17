@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minnesota Sauna Zoning Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .col {
+            flex: 1;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+        .compliant {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .non-compliant {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .pass {
+            background-color: #d4edda;
+        }
+        .fail {
+            background-color: #f8d7da;
+        }
+        .info {
+            background-color: #d1ecf1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 Minnesota Sauna Zoning Checker</h1>
+        <p style="text-align: center; color: #666;">Check if your backyard sauna project complies with Minnesota zoning laws</p>
+        
+        <form id="saunaForm">
+            <div class="form-group">
+                <label for="city">City/County:</label>
+                <input type="text" id="city" name="city" placeholder="e.g., Minneapolis, Saint Paul" required>
+            </div>
+
+            <div class="form-group">
+                <label>Lot Dimensions (feet):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="lotLength" name="lotLength" placeholder="Length" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="lotWidth" name="lotWidth" placeholder="Width" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Sauna Dimensions (feet):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="saunaLength" name="saunaLength" placeholder="Length" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="saunaWidth" name="saunaWidth" placeholder="Width" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="saunaHeight" name="saunaHeight" placeholder="Height" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Distance from Property Lines (feet):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="frontSetback" name="frontSetback" placeholder="From front" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="rearSetback" name="rearSetback" placeholder="From rear" required>
+                    </div>
+                </div>
+                <div class="row" style="margin-top: 15px;">
+                    <div class="col">
+                        <input type="number" id="leftSetback" name="leftSetback" placeholder="From left side" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="rightSetback" name="rightSetback" placeholder="From right side" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="foundation">Foundation Type:</label>
+                <select id="foundation" name="foundation" required>
+                    <option value="">Select foundation type</option>
+                    <option value="permanent">Permanent (concrete pad/foundation)</option>
+                    <option value="portable">Portable (skids/blocks)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="electrical">Electrical Work Required:</label>
+                <select id="electrical" name="electrical" required>
+                    <option value="">Select electrical needs</option>
+                    <option value="none">No electrical</option>
+                    <option value="basic">Basic wiring (outlets/lights)</option>
+                    <option value="heavy">Heavy electrical (240V for heater)</option>
+                </select>
+            </div>
+
+            <button type="submit">Check Zoning Compliance</button>
+        </form>
+
+        <div id="results" class="results">
+            <h2>Compliance Results</h2>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('saunaForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            checkCompliance();
+        });
+
+        function checkCompliance() {
+            const form = document.getElementById('saunaForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            const saunaArea = parseInt(data.saunaLength) * parseInt(data.saunaWidth);
+            const lotArea = parseInt(data.lotLength) * parseInt(data.lotWidth);
+            
+            let results = [];
+            let overallCompliant = true;
+            
+            // Check setbacks (10ft minimum for most MN cities)
+            const minSetback = 10;
+            const setbacks = {
+                rear: parseInt(data.rearSetback),
+                left: parseInt(data.leftSetback),
+                right: parseInt(data.rightSetback),
+                front: parseInt(data.frontSetback)
+            };
+            
+            Object.entries(setbacks).forEach(([side, distance]) => {
+                if (distance < minSetback) {
+                    results.push({
+                        type: 'fail',
+                        message: `❌ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (needs ${minSetback}ft minimum)`
+                    });
+                    overallCompliant = false;
+                } else {
+                    results.push({
+                        type: 'pass',
+                        message: `✅ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (compliant)`
+                    });
+                }
+            });
+            
+            // Check size for permit requirements
+            if (saunaArea > 200) {
+                results.push({
+                    type: 'info',
+                    message: `📋 Size: ${saunaArea} sq ft - Building permit required (over 200 sq ft)`
+                });
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Size: ${saunaArea} sq ft - No building permit required (under 200 sq ft)`
+                });
+            }
+            
+            // Check fire rating requirements
+            const minFireDistance = 5;
+            const needsFireRating = Object.values(setbacks).some(distance => distance < minFireDistance);
+            
+            if (needsFireRating) {
+                results.push({
+                    type: 'fail',
+                    message: `🔥 Fire rating required - sauna is less than 5ft from property line`
+                });
+                overallCompliant = false;
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ No special fire rating required (all setbacks > 5ft)`
+                });
+            }
+            
+            // Check electrical requirements
+            if (data.electrical !== 'none') {
+                results.push({
+                    type: 'info',
+                    message: `⚡ Electrical permit required for ${data.electrical} electrical work`
+                });
+            }
+            
+            // Foundation considerations
+            if (data.foundation === 'permanent') {
+                results.push({
+                    type: 'info',
+                    message: `🏗️ Foundation permit may be required for permanent foundation`
+                });
+            }
+            
+            // Lot coverage check (rough estimate - typically 30% max for residential)
+            const coveragePercent = (saunaArea / lotArea * 100).toFixed(1);
+            results.push({
+                type: 'info',
+                message: `📏 Sauna adds ${coveragePercent}% to lot coverage (check local limits)`
+            });
+            
+            // Suggestions for non-compliant items
+            if (!overallCompliant) {
+                results.push({
+                    type: 'info',
+                    message: `💡 Suggestions: Move sauna further from property lines, or consider a smaller size that fits setback requirements.`
+                });
+            }
+            
+            displayResults(results, overallCompliant);
+        }
+        
+        function displayResults(results, compliant) {
+            const resultsDiv = document.getElementById('results');
+            const contentDiv = document.getElementById('resultContent');
+            
+            resultsDiv.className = `results ${compliant ? 'compliant' : 'non-compliant'}`;
+            
+            let html = `<h3>${compliant ? '✅ Project Appears Compliant!' : '❌ Issues Found'}</h3>`;
+            
+            results.forEach(result => {
+                html += `<div class="result-item ${result.type}">${result.message}</div>`;
+            });
+            
+            html += `<div class="result-item info">
+                <strong>⚠️ Important:</strong> This is a preliminary check only. Contact your local building department at ${document.getElementById('city').value || '[your city]'} for official confirmation and permit applications.
+            </div>`;
+            
+            contentDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
