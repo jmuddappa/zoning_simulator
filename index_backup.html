@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saint Paul Sauna Zoning Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .col {
+            flex: 1;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+        .compliant {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .non-compliant {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .pass {
+            background-color: #d4edda;
+        }
+        .fail {
+            background-color: #f8d7da;
+        }
+        .info {
+            background-color: #d1ecf1;
+        }
+        .diagram-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        #lotDiagram {
+            border: 2px solid #333;
+            margin: 10px auto;
+            background: #f8f9fa;
+            cursor: grab;
+        }
+        #lotDiagram:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 Saint Paul Sauna Zoning Checker</h1>
+        <p style="text-align: center; color: #666;">Check if your backyard sauna project complies with Saint Paul zoning ordinances</p>
+        
+        <form id="saunaForm">
+            <div class="form-group">
+                <label for="city">Location:</label>
+                <input type="text" id="city" name="city" value="Saint Paul, MN" readonly style="background-color: #f8f9fa;">
+            </div>
+
+            <div class="form-group">
+                <label>Lot Dimensions (feet):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="lotLength" name="lotLength" placeholder="Length" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="lotWidth" name="lotWidth" placeholder="Width" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Main House Position (feet from property lines):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="houseFront" name="houseFront" placeholder="From front" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="houseLeft" name="houseLeft" placeholder="From left" required>
+                    </div>
+                </div>
+                <div class="row" style="margin-top: 15px;">
+                    <div class="col">
+                        <input type="number" id="houseLength" name="houseLength" placeholder="House length" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="houseWidth" name="houseWidth" placeholder="House width" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Sauna Dimensions (feet):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="saunaLength" name="saunaLength" placeholder="Length" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="saunaWidth" name="saunaWidth" placeholder="Width" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="saunaHeight" name="saunaHeight" placeholder="Height" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Distance from Property Lines (feet):</label>
+                <div class="row">
+                    <div class="col">
+                        <input type="number" id="frontSetback" name="frontSetback" placeholder="From front" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="rearSetback" name="rearSetback" placeholder="From rear" required>
+                    </div>
+                </div>
+                <div class="row" style="margin-top: 15px;">
+                    <div class="col">
+                        <input type="number" id="leftSetback" name="leftSetback" placeholder="From left side" required>
+                    </div>
+                    <div class="col">
+                        <input type="number" id="rightSetback" name="rightSetback" placeholder="From right side" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="foundation">Foundation Type:</label>
+                <select id="foundation" name="foundation" required>
+                    <option value="">Select foundation type</option>
+                    <option value="permanent">Permanent (concrete pad/foundation)</option>
+                    <option value="portable">Portable (skids/blocks)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="electrical">Electrical Work Required:</label>
+                <select id="electrical" name="electrical" required>
+                    <option value="">Select electrical needs</option>
+                    <option value="none">No electrical</option>
+                    <option value="basic">Basic wiring (outlets/lights)</option>
+                    <option value="heavy">Heavy electrical (240V for heater)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="hasGarage">Existing Garage/Structures:</label>
+                <select id="hasGarage" name="hasGarage" onchange="toggleGarageFields()" required>
+                    <option value="no">No existing structures</option>
+                    <option value="yes" selected>Has garage or other structures</option>
+                </select>
+            </div>
+
+            <div id="garageFields" style="display: block;">
+                <div class="form-group">
+                    <label>Garage/Structure Dimensions (feet):</label>
+                    <div class="row">
+                        <div class="col">
+                            <input type="number" id="garageLength" name="garageLength" placeholder="Length">
+                        </div>
+                        <div class="col">
+                            <input type="number" id="garageWidth" name="garageWidth" placeholder="Width">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Garage Distance from Property Lines (feet):</label>
+                    <div class="row">
+                        <div class="col">
+                            <input type="number" id="garageFront" name="garageFront" placeholder="From front">
+                        </div>
+                        <div class="col">
+                            <input type="number" id="garageRear" name="garageRear" placeholder="From rear">
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top: 15px;">
+                        <div class="col">
+                            <input type="number" id="garageLeft" name="garageLeft" placeholder="From left side">
+                        </div>
+                        <div class="col">
+                            <input type="number" id="garageRight" name="garageRight" placeholder="From right side">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit">Check Zoning Compliance</button>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <h3 style="margin-bottom: 15px;">Quick Test Cases</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <button type="button" onclick="loadTestCase(0)" style="background: #28a745; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">✅ Perfect Compliance</button>
+                    <button type="button" onclick="loadTestCase(1)" style="background: #ffc107; color: black; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">⚠️ Setback Violation</button>
+                    <button type="button" onclick="loadTestCase(2)" style="background: #17a2b8; color: white; padding: 8px 12px; border: none; border-radius: 3px; font-size: 12px;">📋 Needs Permit</button>
+                </div>
+            </div>
+        </form>
+
+        <div id="results" class="results">
+            <h2>Compliance Results</h2>
+            <div class="diagram-container">
+                <h3>Lot Diagram</h3>
+                <canvas id="lotDiagram" width="400" height="300"></canvas>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                    <span style="color: #dc3545;">■</span> Non-compliant area &nbsp;
+                    <span style="color: #28a745;">■</span> Compliant area &nbsp;
+                    <span style="color: #007bff;">■</span> Proposed sauna &nbsp;
+                    <span style="color: #6c757d;">■</span> Existing garage &nbsp;
+                    <span style="color: #17a2b8;">■</span> Main house
+                </p>
+                <p style="font-size: 11px; color: #666; font-style: italic;">
+                    💡 Drag structures to move them and see live compliance updates!
+                </p>
+            </div>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let currentData = null;
+        let canvasScale = 1;
+        let canvasOffsetX = 0;
+        let canvasOffsetY = 0;
+        
+        const testCases = [
+            {
+                name: "Perfect Compliance",
+                lotLength: 60, lotWidth: 40,
+                houseFront: 25, houseLeft: 10, houseLength: 30, houseWidth: 25,
+                saunaLength: 8, saunaWidth: 6, saunaHeight: 10,
+                frontSetback: 10, rearSetback: 8, leftSetback: 5, rightSetback: 5,
+                foundation: "portable", electrical: "basic",
+                hasGarage: "yes", garageLength: 20, garageWidth: 20,
+                garageFront: 5, garageRear: 15, garageLeft: 35, garageRight: 5
+            },
+            {
+                name: "Setback Violation", 
+                lotLength: 50, lotWidth: 30,
+                houseFront: 20, houseLeft: 10, houseLength: 25, houseWidth: 20,
+                saunaLength: 10, saunaWidth: 8, saunaHeight: 12,
+                frontSetback: 5, rearSetback: 2, leftSetback: 4, rightSetback: 6,
+                foundation: "portable", electrical: "none",
+                hasGarage: "yes", garageLength: 20, garageWidth: 20,
+                garageFront: 5, garageRear: 5, garageLeft: 25, garageRight: 5
+            },
+            {
+                name: "Needs Permit",
+                lotLength: 100, lotWidth: 80,
+                houseFront: 30, houseLeft: 20, houseLength: 40, houseWidth: 35,
+                saunaLength: 12, saunaWidth: 12, saunaHeight: 14,
+                frontSetback: 6, rearSetback: 6, leftSetback: 6, rightSetback: 6,
+                foundation: "permanent", electrical: "heavy",
+                hasGarage: "yes", garageLength: 20, garageWidth: 20,
+                garageFront: 25, garageRear: 35, garageLeft: 5, garageRight: 55
+            }
+        ];
+
+        function toggleGarageFields() {
+            const hasGarage = document.getElementById('hasGarage').value;
+            const garageFields = document.getElementById('garageFields');
+            garageFields.style.display = hasGarage === 'yes' ? 'block' : 'none';
+        }
+
+        function loadTestCase(index) {
+            const testCase = testCases[index];
+            
+            Object.keys(testCase).forEach(key => {
+                if (key !== 'name') {
+                    const element = document.getElementById(key);
+                    if (element) element.value = testCase[key];
+                }
+            });
+            
+            document.getElementById('hasGarage').value = testCase.hasGarage;
+            toggleGarageFields();
+            
+            checkCompliance();
+        }
+
+        document.getElementById('saunaForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            checkCompliance();
+        });
+
+        function checkCompliance() {
+            const form = document.getElementById('saunaForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            runComplianceCheck(data);
+        }
+
+        function runComplianceCheck(data) {
+            const saunaArea = parseInt(data.saunaLength) * parseInt(data.saunaWidth);
+            let results = [];
+            let overallCompliant = true;
+            
+            // Check setbacks (3ft minimum for Saint Paul)
+            const minSetback = 3;
+            const setbacks = {
+                rear: parseInt(data.rearSetback),
+                left: parseInt(data.leftSetback),
+                right: parseInt(data.rightSetback),
+                front: parseInt(data.frontSetback)
+            };
+            
+            Object.entries(setbacks).forEach(([side, distance]) => {
+                if (distance < minSetback) {
+                    results.push({
+                        type: 'fail',
+                        message: `❌ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (needs ${minSetback}ft minimum)`
+                    });
+                    overallCompliant = false;
+                } else {
+                    results.push({
+                        type: 'pass', 
+                        message: `✅ ${side.charAt(0).toUpperCase() + side.slice(1)} setback: ${distance}ft (compliant)`
+                    });
+                }
+            });
+            
+            // Check size for permit (120 sq ft threshold)
+            if (saunaArea > 120) {
+                results.push({
+                    type: 'info',
+                    message: `📋 Size: ${saunaArea} sq ft - Building permit required (over 120 sq ft)`
+                });
+            } else {
+                results.push({
+                    type: 'pass',
+                    message: `✅ Size: ${saunaArea} sq ft - No building permit required`
+                });
+            }
+            
+            // Check height (15ft max)
+            const saunaHeight = parseInt(data.saunaHeight);
+            if (saunaHeight > 15) {
+                results.push({
+                    type: 'fail',
+                    message: `❌ Height: ${saunaHeight}ft exceeds 15ft Saint Paul limit`
+                });
+                overallCompliant = false;
+            }
+            
+            // Check distance from house (6ft minimum)
+            if (data.houseLength) {
+                const houseDistance = calculateDistanceFromHouse(data);
+                if (houseDistance < 6) {
+                    results.push({
+                        type: 'fail',
+                        message: `❌ Too close to house: ${houseDistance.toFixed(1)}ft (needs 6ft minimum)`
+                    });
+                    overallCompliant = false;
+                } else {
+                    results.push({
+                        type: 'pass',
+                        message: `✅ House distance: ${houseDistance.toFixed(1)}ft (compliant)`
+                    });
+                }
+            }
+            
+            displayResults(results, overallCompliant, data);
+        }
+        
+        function calculateDistanceFromHouse(data) {
+            const houseFront = parseInt(data.houseFront);
+            const houseLeft = parseInt(data.houseLeft);
+            const houseLength = parseInt(data.houseLength);
+            const houseWidth = parseInt(data.houseWidth);
+            const saunaFront = parseInt(data.frontSetback);
+            const saunaLeft = parseInt(data.leftSetback);
+            const saunaLength = parseInt(data.saunaLength);
+            const saunaWidth = parseInt(data.saunaWidth);
+            
+            // Simple distance calculation - could be improved
+            const houseCenterX = houseLeft + houseLength/2;
+            const houseCenterY = houseFront + houseWidth/2;
+            const saunaCenterX = saunaLeft + saunaLength/2;
+            const saunaCenterY = saunaFront + saunaWidth/2;
+            
+            return Math.sqrt(Math.pow(houseCenterX - saunaCenterX, 2) + Math.pow(houseCenterY - saunaCenterY, 2));
+        }
+
+        function drawLotDiagram(data) {
+            const canvas = document.getElementById('lotDiagram');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const lotLength = parseInt(data.lotLength);
+            const lotWidth = parseInt(data.lotWidth);
+            const maxDimension = Math.max(lotLength, lotWidth);
+            const scale = 360 / maxDimension;
+            const scaledLength = lotLength * scale;
+            const scaledWidth = lotWidth * scale;
+            const offsetX = (canvas.width - scaledLength) / 2;
+            const offsetY = (canvas.height - scaledWidth) / 2;
+            
+            // Store for interactivity
+            canvasScale = scale;
+            canvasOffsetX = offsetX;
+            canvasOffsetY = offsetY;
+            
+            // Draw lot boundary
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(offsetX, offsetY, scaledLength, scaledWidth);
+            
+            // Draw setback zones (non-compliant areas)
+            ctx.fillStyle = 'rgba(220, 53, 69, 0.3)';
+            const setbackZone = 3 * scale;
+            ctx.fillRect(offsetX, offsetY, scaledLength, setbackZone); // Front
+            ctx.fillRect(offsetX, offsetY + scaledWidth - setbackZone, scaledLength, setbackZone); // Rear
+            ctx.fillRect(offsetX, offsetY, setbackZone, scaledWidth); // Left
+            ctx.fillRect(offsetX + scaledLength - setbackZone, offsetY, setbackZone, scaledWidth); // Right
+            
+            // Draw compliant area
+            ctx.fillStyle = 'rgba(40, 167, 69, 0.3)';
+            const compliantX = offsetX + setbackZone;
+            const compliantY = offsetY + setbackZone;
+            const compliantWidth = scaledLength - 2 * setbackZone;
+            const compliantHeight = scaledWidth - 2 * setbackZone;
+            if (compliantWidth > 0 && compliantHeight > 0) {
+                ctx.fillRect(compliantX, compliantY, compliantWidth, compliantHeight);
+            }
+            
+            // Draw main house
+            if (data.houseLength) {
+                const houseX = offsetX + (parseInt(data.houseLeft) * scale);
+                const houseY = offsetY + (parseInt(data.houseFront) * scale);
+                const houseW = parseInt(data.houseLength) * scale;
+                const houseH = parseInt(data.houseWidth) * scale;
+                
+                ctx.fillStyle = 'rgba(23, 162, 184, 0.8)';
+                ctx.fillRect(houseX, houseY, houseW, houseH);
+                ctx.strokeStyle = '#17a2b8';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(houseX, houseY, houseW, houseH);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('HOUSE', houseX + houseW/2, houseY + houseH/2 + 3);
+            }
+            
+            // Draw garage
+            if (data.hasGarage === 'yes' && data.garageLength) {
+                const garageX = offsetX + (parseInt(data.garageLeft) * scale);
+                const garageY = offsetY + (parseInt(data.garageFront) * scale);
+                const garageW = parseInt(data.garageLength) * scale;
+                const garageH = parseInt(data.garageWidth) * scale;
+                
+                ctx.fillStyle = 'rgba(108, 117, 125, 0.7)';
+                ctx.fillRect(garageX, garageY, garageW, garageH);
+                ctx.strokeStyle = '#6c757d';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(garageX, garageY, garageW, garageH);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GARAGE', garageX + garageW/2, garageY + garageH/2 + 3);
+            }
+            
+            // Draw sauna
+            const saunaX = offsetX + (parseInt(data.leftSetback) * scale);
+            const saunaY = offsetY + (parseInt(data.frontSetback) * scale);
+            const saunaW = parseInt(data.saunaLength) * scale;
+            const saunaH = parseInt(data.saunaWidth) * scale;
+            
+            const isCompliant = parseInt(data.frontSetback) >= 3 && parseInt(data.rearSetback) >= 3 && 
+                               parseInt(data.leftSetback) >= 3 && parseInt(data.rightSetback) >= 3;
+            
+            ctx.fillStyle = isCompliant ? 'rgba(0, 123, 255, 0.7)' : 'rgba(255, 193, 7, 0.7)';
+            ctx.fillRect(saunaX, saunaY, saunaW, saunaH);
+            
+            ctx.strokeStyle = isCompliant ? '#007bff' : '#ffc107';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(saunaX, saunaY, saunaW, saunaH);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('SAUNA', saunaX + saunaW/2, saunaY + saunaH/2 + 3);
+        }
+
+        function displayResults(results, compliant, data) {
+            const resultsDiv = document.getElementById('results');
+            const contentDiv = document.getElementById('resultContent');
+            
+            currentData = data;
+            
+            resultsDiv.className = `results ${compliant ? 'compliant' : 'non-compliant'}`;
+            
+            let html = `<h3>${compliant ? '✅ Project Appears Compliant!' : '❌ Issues Found'}</h3>`;
+            
+            results.forEach(result => {
+                html += `<div class="result-item ${result.type}">${result.message}</div>`;
+            });
+            
+            html += `<div class="result-item info">
+                <strong>⚠️ Important:</strong> This is a preliminary check based on Saint Paul zoning ordinances. For official confirmation and permit applications, contact:<br>
+                <strong>Saint Paul Department of Safety and Inspections</strong><br>
+                375 Jackson Street, Suite 220, Saint Paul, MN 55101<br>
+                Phone: <strong>651-266-8989</strong><br>
+                Use the new PAULIE online permitting system launched September 2024.
+            </div>`;
+            
+            contentDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+            
+            drawLotDiagram(data);
+            setupDragFunctionality();
+            
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function setupDragFunctionality() {
+            const canvas = document.getElementById('lotDiagram');
+            if (canvas.hasAttribute('data-interactive')) return; // Already set up
+            
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseUp);
+            canvas.setAttribute('data-interactive', 'true');
+        }
+        
+        function handleMouseDown(e) {
+            if (!currentData) return;
+            
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const saunaX = canvasOffsetX + (parseInt(currentData.leftSetback) * canvasScale);
+            const saunaY = canvasOffsetY + (parseInt(currentData.frontSetback) * canvasScale);
+            const saunaW = parseInt(currentData.saunaLength) * canvasScale;
+            const saunaH = parseInt(currentData.saunaWidth) * canvasScale;
+            
+            if (x >= saunaX && x <= saunaX + saunaW && y >= saunaY && y <= saunaY + saunaH) {
+                isDragging = true;
+                dragStartX = x - saunaX;
+                dragStartY = y - saunaY;
+                e.target.style.cursor = 'grabbing';
+            }
+        }
+        
+        function handleMouseMove(e) {
+            if (!isDragging || !currentData) return;
+            
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const newSaunaX = x - dragStartX;
+            const newSaunaY = y - dragStartY;
+            
+            const newLeftSetback = Math.max(0, Math.round((newSaunaX - canvasOffsetX) / canvasScale));
+            const newFrontSetback = Math.max(0, Math.round((newSaunaY - canvasOffsetY) / canvasScale));
+            
+            const lotLength = parseInt(currentData.lotLength);
+            const lotWidth = parseInt(currentData.lotWidth);
+            const saunaLength = parseInt(currentData.saunaLength);
+            const saunaWidth = parseInt(currentData.saunaWidth);
+            
+            const maxLeft = lotLength - saunaLength;
+            const maxFront = lotWidth - saunaWidth;
+            
+            const clampedLeft = Math.min(maxLeft, newLeftSetback);
+            const clampedFront = Math.min(maxFront, newFrontSetback);
+            
+            // Update form and data
+            document.getElementById('leftSetback').value = clampedLeft;
+            document.getElementById('frontSetback').value = clampedFront;
+            document.getElementById('rearSetback').value = lotWidth - clampedFront - saunaWidth;
+            document.getElementById('rightSetback').value = lotLength - clampedLeft - saunaLength;
+            
+            currentData.leftSetback = clampedLeft;
+            currentData.frontSetback = clampedFront;
+            currentData.rearSetback = lotWidth - clampedFront - saunaWidth;
+            currentData.rightSetback = lotLength - clampedLeft - saunaLength;
+            
+            // Update display
+            drawLotDiagram(currentData);
+            runComplianceCheck(currentData);
+        }
+        
+        function handleMouseUp(e) {
+            if (isDragging) {
+                isDragging = false;
+                e.target.style.cursor = 'grab';
+            }
+        }
+    </script>
+</body>
+</html>
